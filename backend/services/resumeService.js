@@ -1,15 +1,36 @@
 const supabase = require("../config/supabase");
+const path = require("path");
 
 const uploadResume = async (candidateId, file) => {
   // Generate unique filename
   const fileName = `${Date.now()}-${file.originalname}`;
+
+  // Determine correct MIME type
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  let fileType = file.mimetype;
+
+  if (fileType === "application/octet-stream") {
+    switch (ext) {
+      case ".pdf":
+        fileType = "application/pdf";
+        break;
+      case ".doc":
+        fileType = "application/msword";
+        break;
+      case ".docx":
+        fileType =
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        break;
+    }
+  }
 
   // Upload file to Supabase Storage
   const { data: uploadData, error: uploadError } =
     await supabase.storage
       .from("resume-files")
       .upload(fileName, file.buffer, {
-        contentType: file.mimetype,
+        contentType: fileType,
       });
 
   if (uploadError) {
@@ -25,7 +46,7 @@ const uploadResume = async (candidateId, file) => {
         file_name: file.originalname,
         file_url: uploadData.path,
         file_size: file.size,
-        file_type: file.mimetype,
+        file_type: fileType,
       },
     ])
     .select()
