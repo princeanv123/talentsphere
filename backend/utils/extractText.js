@@ -1,31 +1,25 @@
-const fs = require("fs");
-const path = require("path");
 const pdf = require("pdf-parse");
 const mammoth = require("mammoth");
+const path = require("path");
 
-const extractText = async (filePath) => {
-  const extension = path.extname(filePath).toLowerCase();
+const extractText = async (file) => {
 
-  try {
-    if (extension === ".pdf") {
-      const buffer = fs.readFileSync(filePath);
-      const data = await pdf(buffer);
-      return data.text;
-    }
+  const extension = path.extname(file.originalname).toLowerCase();
 
-    if (extension === ".docx") {
-      const result = await mammoth.extractRawText({
-        path: filePath,
-      });
-
-      return result.value;
-    }
-
-    throw new Error("Unsupported resume format.");
-  } catch (error) {
-    console.error("Resume extraction failed:", error.message);
-    throw error;
+  if (extension === ".pdf") {
+    const data = await pdf(file.buffer);
+    return data.text;
   }
+
+  if (extension === ".docx") {
+    const result = await mammoth.extractRawText({
+      buffer: file.buffer,
+    });
+
+    return result.value;
+  }
+
+  throw new Error("Unsupported resume format.");
 };
 
 module.exports = extractText;

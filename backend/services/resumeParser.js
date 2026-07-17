@@ -1,15 +1,20 @@
 const extractText = require("../utils/extractText");
 const { parseResume } = require("./geminiService");
 
-const resumeParser = async (filePath) => {
+const resumeParser = async (file) => {
   try {
-    // Step 1: Extract text
-    const resumeText = await extractText(filePath);
 
-    // Step 2: Parse with Gemini
+    // Step 1: Extract text from resume
+    const resumeText = await extractText(file);
+
+    // Step 2: Send to Gemini
     const aiResponse = await parseResume(resumeText);
 
-    // Step 3: Clean AI response
+    console.log("=========== GEMINI RAW RESPONSE ===========");
+    console.log(aiResponse);
+    console.log("===========================================");
+
+    // Step 3: Remove markdown
     const cleanedResponse = aiResponse
       .replace(/```json/g, "")
       .replace(/```/g, "")
@@ -17,6 +22,10 @@ const resumeParser = async (filePath) => {
 
     // Step 4: Convert to JSON
     const candidateProfile = JSON.parse(cleanedResponse);
+
+    console.log("=========== PARSED JSON ===========");
+    console.log(JSON.stringify(candidateProfile, null, 2));
+    console.log("==================================");
 
     return candidateProfile;
 
