@@ -54,10 +54,29 @@ Rules:
 
 8. projects must be an array.
 
-Return ONLY JSON.
-Do not include markdown.
-Do not include explanation.
-Do not include code fences.
+IMPORTANT:
+
+Return ONLY a single valid JSON object.
+
+The response MUST be parseable by JavaScript JSON.parse().
+
+Do NOT include:
+- Markdown code fences
+- JSON code fences
+- Explanations
+- Notes
+- Comments
+- Trailing commas
+- Missing commas
+
+Every array must be valid JSON.
+
+If a field is unavailable, return:
+- "" for strings
+- [] for arrays
+- 0 for experience
+
+Never invent values.
 
 Resume:
 

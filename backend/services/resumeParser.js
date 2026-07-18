@@ -21,7 +21,16 @@ const resumeParser = async (file) => {
       .trim();
 
     // Step 4: Convert to JSON
-    const candidateProfile = JSON.parse(cleanedResponse);
+    let candidateProfile;
+
+try {
+  candidateProfile = JSON.parse(cleanedResponse);
+} catch (err) {
+  console.error("=========== INVALID GEMINI RESPONSE ===========");
+  console.error(cleanedResponse);
+  console.error("===============================================");
+  throw new Error("Gemini returned invalid JSON.");
+}
 
     console.log("=========== PARSED JSON ===========");
     console.log(JSON.stringify(candidateProfile, null, 2));

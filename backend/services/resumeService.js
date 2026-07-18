@@ -1,9 +1,10 @@
+const { saveCandidateSkills } = require("./skillService");
 const supabase = require("../config/supabase");
 const path = require("path");
 const resumeParser = require("./resumeParser");
 
-const uploadResume = async (candidateId, file) => {
-
+const uploadResume = async (file) => {
+  // Generate unique filename
   const fileName = `${Date.now()}-${file.originalname}`;
 
   let fileType = file.mimetype;
@@ -27,7 +28,7 @@ const uploadResume = async (candidateId, file) => {
     }
   }
 
-  // Upload to Supabase Storage
+  // Upload Resume to Supabase Storage
   const { data: uploadData, error: uploadError } =
     await supabase.storage
       .from("resume-files")
@@ -41,43 +42,57 @@ const uploadResume = async (candidateId, file) => {
 
   // Parse Resume using AI
   console.log("============== FILE DEBUG ==============");
-console.log(file);
-console.log("originalname:", file.originalname);
-console.log("typeof originalname:", typeof file.originalname);
-console.log("========================================");
-  const parsedData = await resumeParser(file);
+  console.log(file);
+  console.log("originalname:", file.originalname);
+  console.log("typeof originalname:", typeof file.originalname);
+  console.log("========================================");
 
-  console.log(
-  JSON.stringify(parsedData, null, 2)
+  const parsedData = await resumeParser(file);
+console.log("=========== SKILLS FROM GEMINI ===========");
+console.log(parsedData.skills);
+console.log("==========================================");
+  console.log("===== parsedData =====");
+  console.log(JSON.stringify(parsedData, null, 2));
+  console.log("======================");
+
+  // Insert New Candidate
+  const { data: candidate, error: candidateError } = await supabase
+    .from("candidates")
+    .insert([
+      {
+        full_name: parsedData.name,
+        email: parsedData.email,
+        phone: parsedData.phone,
+        location: parsedData.location,
+        experience: parsedData.experience,
+        summary: parsedData.summary,
+        resume_url: uploadData.path,
+      },
+    ])
+    .select()
+    .single();
+
+  if (candidateError) {
+    throw new Error(candidateError.message);
+  }
+
+  console.log("Candidate created successfully:");
+  console.log(candidate);
+// Save Candidate Skills
+console.log("Saving candidate skills...");
+
+await saveCandidateSkills(
+  candidate.id,
+  parsedData.skills
 );
 
-  console.log("===== parsedData =====");
-console.log(JSON.stringify(parsedData, null, 2));
-console.log("======================");
-
-  const { error: updateError } = await supabase
-  .from("candidates")
-  .update({
-    full_name: parsedData.name,
-    email: parsedData.email,
-    phone: parsedData.phone,
-    location: parsedData.location,
-    experience: parsedData.experience,
-    summary: parsedData.summary,
-    resume_url: uploadData.path,
-  })
-  .eq("id", candidateId);
-
-if (updateError) {
-  throw new Error(updateError.message);
-}
-
+console.log("Candidate skills saved.");
   // Save Resume Metadata
   const { data, error } = await supabase
     .from("resumes")
     .insert([
       {
-        candidate_id: candidateId,
+        candidate_id: candidate.id,
         file_name: file.originalname,
         file_url: uploadData.path,
         file_size: file.size,
@@ -91,7 +106,10 @@ if (updateError) {
     throw new Error(error.message);
   }
 
-  return data;
+  return {
+    candidate,
+    resume: data,
+  };
 };
 
 module.exports = {

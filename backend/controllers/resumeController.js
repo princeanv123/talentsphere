@@ -2,24 +2,18 @@ const { uploadResume } = require("../services/resumeService");
 
 const uploadResumeController = async (req, res) => {
   try {
-    const { candidateId } = req.body;
-
-    if (!candidateId) {
-      return res.status(400).json({
-        success: false,
-        message: "candidateId is required.",
-      });
-    }
-
+    // Check if file is uploaded
     if (!req.file) {
       return res.status(400).json({
         success: false,
         message: "No resume file uploaded.",
       });
     }
-console.log("Body:", req.body);
-console.log("File:", req.file);
-    const uploadedResume = await uploadResume(candidateId, req.file);
+
+    console.log("File:", req.file);
+
+    // Upload resume and create candidate automatically
+    const uploadedResume = await uploadResume(req.file);
 
     return res.status(201).json({
       success: true,
