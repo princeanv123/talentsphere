@@ -21,9 +21,37 @@ Return ONLY valid JSON.
   "experience": 0,
   "summary": "",
   "skills": [],
-  "education": [],
-  "certifications": [],
-  "projects": []
+
+  "education": [
+    {
+      "degree": "",
+      "institution": "",
+      "field_of_study": "",
+      "start_year": "",
+      "end_year": "",
+      "grade": ""
+    }
+  ],
+
+  "certifications": [
+    {
+      "name": "",
+      "issuer": "",
+      "issue_date": "",
+      "expiry_date": "",
+      "credential_id": ""
+    }
+  ],
+
+  "projects": [
+    {
+      "name": "",
+      "description": "",
+      "technologies": [],
+      "role": "",
+      "duration": ""
+    }
+  ]
 }
 
 Rules:
@@ -48,11 +76,39 @@ Rules:
 
 5. skills must be an array of strings.
 
-6. education must be an array.
+6. education must be an array of objects.
 
-7. certifications must be an array.
+Each education object must contain:
+- degree
+- institution
+- field_of_study
+- start_year
+- end_year
+- grade
 
-8. projects must be an array.
+If any value is unavailable, return an empty string.
+
+7. certifications must be an array of objects.
+
+Each certification object must contain:
+- name
+- issuer
+- issue_date
+- expiry_date
+- credential_id
+
+If any value is unavailable, return an empty string.
+
+8. projects must be an array of objects.
+
+Each project object must contain:
+- name
+- description
+- technologies (array)
+- role
+- duration
+
+If unavailable, return an empty string or empty array.
 
 IMPORTANT:
 
@@ -77,6 +133,13 @@ If a field is unavailable, return:
 - 0 for experience
 
 Never invent values.
+Do not return education, certifications, or projects as plain strings.
+
+Always return them as objects that exactly match the schema above.
+
+If only a university name is found, populate the institution field and leave the remaining fields as empty strings.
+
+If only a certification name is found, populate the name field and leave the remaining fields as empty strings.
 
 Resume:
 

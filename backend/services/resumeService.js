@@ -1,4 +1,7 @@
+
+const { saveCandidateEducation } = require("./educationService");
 const { saveCandidateSkills } = require("./skillService");
+const { saveCandidateCertifications } = require("./certificationService");
 const supabase = require("../config/supabase");
 const path = require("path");
 const resumeParser = require("./resumeParser");
@@ -80,11 +83,27 @@ console.log("==========================================");
   console.log(candidate);
 // Save Candidate Skills
 console.log("Saving candidate skills...");
-
+console.log("saveCandidateEducation =", saveCandidateEducation);
+console.log("saveCandidateSkills =", saveCandidateSkills);
+console.log("saveCandidateCertifications =", saveCandidateCertifications);
 await saveCandidateSkills(
   candidate.id,
   parsedData.skills
 );
+
+await saveCandidateEducation(
+  candidate.id,
+  parsedData.education
+);
+
+await saveCandidateCertifications(
+  candidate.id,
+  parsedData.certifications
+);
+
+console.log("Candidate skills saved.");
+console.log("Candidate education saved.");
+console.log("Candidate certifications saved.");
 
 console.log("Candidate skills saved.");
   // Save Resume Metadata
