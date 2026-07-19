@@ -5,7 +5,11 @@ const path = require("path");
 const extractText = async (file) => {
 
   const extension = path.extname(file.originalname).toLowerCase();
-
+console.log("========== FILE DEBUG ==========");
+console.log("Original Name:", file.originalname);
+console.log("Extension:", extension);
+console.log("Mime Type:", file.mimetype);
+console.log("===============================");
   if (extension === ".pdf") {
     const data = await pdf(file.buffer);
     return data.text;
