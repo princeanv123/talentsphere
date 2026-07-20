@@ -12,7 +12,45 @@ const getAllCandidates = async () => {
 
   return data;
 };
-console.log("getAllCandidates =", getAllCandidates);
+
+const searchCandidates = async ({
+  keyword,
+  location,
+  experience,
+}) => {
+  let query = supabase
+    .from("candidates")
+    .select("*");
+
+  if (keyword) {
+    query = query.or(
+      `full_name.ilike.%${keyword}%,email.ilike.%${keyword}%`
+    );
+  }
+
+  if (location) {
+    query = query.ilike("location", `%${location}%`);
+  }
+
+  if (experience) {
+    query = query.gte("experience", experience);
+  }
+
+  const { data, error } = await query.order("experience", {
+    ascending: false,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+};
+console.log({
+  getAllCandidates,
+  searchCandidates,
+});
 module.exports = {
   getAllCandidates,
+  searchCandidates,
 };
