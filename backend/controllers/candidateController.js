@@ -3,6 +3,7 @@ const {
   searchCandidates,
   getCandidateById,
 } = require("../services/candidateSearchService");
+const { updateCandidate } = require("../services/candidateUpdateService");
 console.log({
   getAllCandidates,
   searchCandidates,
@@ -72,8 +73,30 @@ const getCandidateDetails = async (req, res) => {
     });
   }
 };
+
+const updateCandidateController = async (req, res) => {
+  try {
+    console.log("Request Body:", req.body);
+
+    const candidate = await updateCandidate(req.params.id, req.body);
+
+    res.status(200).json({
+      success: true,
+      message: "Candidate updated successfully",
+      data: candidate,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 module.exports = {
   getCandidates,
   searchCandidate,
   getCandidateDetails,
+  updateCandidateController,
 };

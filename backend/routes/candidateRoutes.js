@@ -5,6 +5,7 @@ const {
   getCandidates,
   searchCandidate,
   getCandidateDetails,
+  updateCandidateController,
 } = require("../controllers/candidateController");
 
 console.log({
@@ -18,5 +19,5 @@ router.get("/search", searchCandidate);
 router.get("/:id", getCandidateDetails);
 
 router.get("/", getCandidates);
-
+router.put("/:id", updateCandidateController);
 module.exports = router;
