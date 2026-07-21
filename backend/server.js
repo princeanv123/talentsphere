@@ -7,6 +7,7 @@ const supabase = require("./config/supabase");
 const resumeRoutes = require("./routes/resumeRoutes");
 const candidateRoutes = require("./routes/candidateRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const jobRoutes = require("./routes/jobRoutes");
 
 
 const app = express();
@@ -17,6 +18,7 @@ app.use(express.json());
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/candidates", candidateRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/jobs", jobRoutes);
 
 app.get("/", (req, res) => {
   res.send("TalentSphere Backend is Running 🚀");
