@@ -6,6 +6,7 @@ require("dotenv").config();
 const supabase = require("./config/supabase");
 const resumeRoutes = require("./routes/resumeRoutes");
 const candidateRoutes = require("./routes/candidateRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 
 
 const app = express();
@@ -15,6 +16,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/candidates", candidateRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 app.get("/", (req, res) => {
   res.send("TalentSphere Backend is Running 🚀");

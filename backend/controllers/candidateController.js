@@ -4,6 +4,7 @@ const {
   getCandidateById,
 } = require("../services/candidateSearchService");
 const { updateCandidate } = require("../services/candidateUpdateService");
+const { deleteCandidate } = require("../services/candidateDeleteService");
 console.log({
   getAllCandidates,
   searchCandidates,
@@ -94,9 +95,30 @@ const updateCandidateController = async (req, res) => {
     });
   }
 };
+const deleteCandidateController = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const candidate = await deleteCandidate(id);
+
+    res.status(200).json({
+      success: true,
+      message: "Candidate deleted successfully",
+      data: candidate,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(404).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 module.exports = {
   getCandidates,
   searchCandidate,
   getCandidateDetails,
   updateCandidateController,
+  deleteCandidateController,
 };

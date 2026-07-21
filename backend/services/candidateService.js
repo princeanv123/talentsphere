@@ -4,16 +4,27 @@ const findOrCreateCandidate = async (parsedData, resumePath) => {
   let candidate;
   let isNewCandidate = false;
 
-  // Check if candidate already exists
-  const { data: existingCandidate, error: fetchError } = await supabase
+    console.log("========== Candidate Lookup ==========");
+  console.log("Parsed Name :", parsedData.name);
+  console.log("Parsed Email:", parsedData.email);
+  console.log("======================================");
+
+// Check if candidate already exists
+let existingCandidate = null;
+
+if (parsedData.email && parsedData.email.trim() !== "") {
+  const { data, error } = await supabase
     .from("candidates")
     .select("*")
-    .eq("email", parsedData.email)
+    .eq("email", parsedData.email.trim())
     .maybeSingle();
 
-  if (fetchError) {
-    throw new Error(fetchError.message);
+  if (error) {
+    throw new Error(error.message);
   }
+
+  existingCandidate = data;
+}
 
   if (existingCandidate) {
     console.log("Existing candidate found.");
