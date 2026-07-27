@@ -3,12 +3,6 @@ const {
   getAllJobs,
 } = require("../services/jobService");
 
-console.log("✅ jobController loaded");
-console.log({
-  createJob,
-  getAllJobs,
-});
-
 const VALID_EMPLOYMENT_TYPES = [
   "full-time",
   "part-time",
@@ -43,7 +37,7 @@ const createJobController = async (req, res) => {
     location = location?.trim();
     description = description?.trim();
 
-    // Required fields
+    // Required fields validation
     if (!title || !company_name || !department || !description) {
       return res.status(400).json({
         success: false,
@@ -74,7 +68,7 @@ const createJobController = async (req, res) => {
         });
       }
 
-      // Store nicely formatted value
+      // Normalize before saving
       employment_type = employment_type
         .split("-")
         .map(
@@ -122,12 +116,19 @@ const createJobController = async (req, res) => {
 
 const getAllJobsController = async (req, res) => {
   try {
-    const jobs = await getAllJobs();
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+
+    const result = await getAllJobs(page, limit);
 
     return res.status(200).json({
       success: true,
-      count: jobs.length,
-      data: jobs,
+      currentPage: result.currentPage,
+      pageSize: result.pageSize,
+      totalRecords: result.totalRecords,
+      totalPages: result.totalPages,
+      count: result.jobs.length,
+      data: result.jobs,
     });
 
   } catch (error) {
