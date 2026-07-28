@@ -8,6 +8,7 @@ const resumeRoutes = require("./routes/resumeRoutes");
 const candidateRoutes = require("./routes/candidateRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const jobRoutes = require("./routes/jobRoutes");
+const applicationRoutes = require("./routes/applicationRoutes");
 
 
 const app = express();
@@ -19,6 +20,7 @@ app.use("/api/resumes", resumeRoutes);
 app.use("/api/candidates", candidateRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/jobs", jobRoutes);
+app.use("/api/applications", applicationRoutes);
 
 app.get("/", (req, res) => {
   res.send("TalentSphere Backend is Running 🚀");
