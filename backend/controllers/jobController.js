@@ -3,6 +3,7 @@ const {
   getAllJobs,
   getJobById,
   updateJob,
+  deleteJob,
 } = require("../services/jobService");
 
 const VALID_EMPLOYMENT_TYPES = [
@@ -271,9 +272,33 @@ const updateJobController = async (req, res) => {
     });
   }
 };
+
+const deleteJobController = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedJob = await deleteJob(id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Job deleted successfully",
+      data: deletedJob,
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    return res.status(404).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   createJobController,
   getAllJobsController,
   getJobByIdController,
   updateJobController,
+  deleteJobController,
 };

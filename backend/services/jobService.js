@@ -135,9 +135,29 @@ const updateJob = async (jobId, jobData) => {
   return data;
 };
 
+const deleteJob = async (jobId) => {
+  const { data, error } = await supabase
+    .from("jobs")
+    .delete()
+    .eq("id", jobId)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("Job not found");
+  }
+
+  return data;
+};
+
 module.exports = {
   createJob,
   getAllJobs,
   getJobById,
   updateJob,
+  deleteJob,
 };
