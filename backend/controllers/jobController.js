@@ -1,6 +1,8 @@
 const {
   createJob,
   getAllJobs,
+  getJobById,
+  updateJob,
 } = require("../services/jobService");
 
 const VALID_EMPLOYMENT_TYPES = [
@@ -119,7 +121,19 @@ const getAllJobsController = async (req, res) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
 
-    const result = await getAllJobs(page, limit);
+    const search = req.query.search || "";
+    const department = req.query.department || "";
+    const employment_type = req.query.employment_type || "";
+    const status = req.query.status || "";
+
+    const result = await getAllJobs(
+      page,
+      limit,
+      search,
+      department,
+      employment_type,
+      status
+    );
 
     return res.status(200).json({
       success: true,
@@ -141,7 +155,125 @@ const getAllJobsController = async (req, res) => {
   }
 };
 
+const getJobByIdController = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const job = await getJobById(id);
+
+    return res.status(200).json({
+      success: true,
+      data: job,
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    return res.status(404).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+const updateJobController = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    let {
+      title,
+      company_name,
+      department,
+      location,
+      employment_type,
+      experience_required,
+      description,
+      status,
+    } = req.body;
+
+    // Trim string inputs
+    title = title?.trim();
+    company_name = company_name?.trim();
+    department = department?.trim();
+    location = location?.trim();
+    description = description?.trim();
+
+    // Required field validation
+    if (!title || !company_name || !department || !description) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Title, Company Name, Department and Description are required.",
+      });
+    }
+
+    // Experience validation
+    if (
+      experience_required != null &&
+      Number(experience_required) < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Experience cannot be negative.",
+      });
+    }
+
+    // Employment Type validation
+    if (employment_type) {
+      employment_type = employment_type.trim().toLowerCase();
+
+      if (!VALID_EMPLOYMENT_TYPES.includes(employment_type)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid employment type.",
+        });
+      }
+
+      employment_type = employment_type
+        .split("-")
+        .map(
+          (word) =>
+            word.charAt(0).toUpperCase() + word.slice(1)
+        )
+        .join("-");
+    }
+
+    // Status validation
+    if (status && !VALID_STATUS.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status.",
+      });
+    }
+
+    const job = await updateJob(id, {
+      title,
+      company_name,
+      department,
+      location,
+      employment_type,
+      experience_required,
+      description,
+      status,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Job updated successfully",
+      data: job,
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    return res.status(404).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 module.exports = {
   createJobController,
   getAllJobsController,
+  getJobByIdController,
+  updateJobController,
 };
