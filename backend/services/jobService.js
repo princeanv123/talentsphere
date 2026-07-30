@@ -1,15 +1,21 @@
 const supabase = require("../config/supabase");
+const { saveJobSkills } = require("./jobSkillService");
 
 const createJob = async (jobData) => {
+
+  const { skills = [], ...jobDetails } = jobData;
+
   const { data, error } = await supabase
     .from("jobs")
-    .insert([jobData])
+    .insert([jobDetails])
     .select()
     .single();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  await saveJobSkills(data.id, skills);
 
   return data;
 };

@@ -21,6 +21,7 @@ const VALID_STATUS = [
 
 const createJobController = async (req, res) => {
   try {
+    console.log("Request Body:", req.body);
     let {
       title,
       company_name,
@@ -31,6 +32,7 @@ const createJobController = async (req, res) => {
       description,
       status,
       created_by,
+      skills,
     } = req.body;
 
     // Trim inputs
@@ -39,6 +41,12 @@ const createJobController = async (req, res) => {
     department = department?.trim();
     location = location?.trim();
     description = description?.trim();
+
+    if (skills && Array.isArray(skills)) {
+  skills = skills
+    .map(skill => skill.trim())
+    .filter(Boolean);
+}
 
     // Required fields validation
     if (!title || !company_name || !department || !description) {
@@ -89,17 +97,18 @@ const createJobController = async (req, res) => {
       });
     }
 
-    const job = await createJob({
-      title,
-      company_name,
-      department,
-      location,
-      employment_type,
-      experience_required,
-      description,
-      status,
-      created_by,
-    });
+const job = await createJob({
+  title,
+  company_name,
+  department,
+  location,
+  employment_type,
+  experience_required,
+  description,
+  status,
+  created_by,
+  skills,
+});
 
     return res.status(201).json({
       success: true,
@@ -189,6 +198,8 @@ const updateJobController = async (req, res) => {
       experience_required,
       description,
       status,
+      created_by,
+      skills,
     } = req.body;
 
     // Trim string inputs
@@ -198,6 +209,7 @@ const updateJobController = async (req, res) => {
     location = location?.trim();
     description = description?.trim();
 
+ 
     // Required field validation
     if (!title || !company_name || !department || !description) {
       return res.status(400).json({

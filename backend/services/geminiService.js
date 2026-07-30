@@ -7,6 +7,10 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
+// ======================================================
+// Resume Parser
+// ======================================================
+
 const parseResume = async (resumeText) => {
   const prompt = `
 You are an AI resume parser.
@@ -23,7 +27,6 @@ Return ONLY valid JSON.
   "experience": 0,
   "summary": "",
   "skills": [],
-
   "education": [
     {
       "degree": "",
@@ -34,7 +37,6 @@ Return ONLY valid JSON.
       "grade": ""
     }
   ],
-
   "certifications": [
     {
       "name": "",
@@ -44,7 +46,6 @@ Return ONLY valid JSON.
       "credential_id": ""
     }
   ],
-
   "projects": [
     {
       "name": "",
@@ -59,41 +60,18 @@ Return ONLY valid JSON.
 Rules:
 
 1. experience must be ONLY the total years of professional experience as a NUMBER.
-Example:
-8
-12
-18
-
 2. DO NOT put job history inside experience.
-
-3. Extract the candidate's location as:
-"City, State, Country"
-
-Example:
-"Saint Paul, Minnesota, USA"
-
-Do NOT include street address or ZIP code.
-
-4. summary must be a 2-3 sentence professional summary.
-
+3. Location format:
+   City, State, Country
+4. summary must be 2-3 sentences.
 5. skills must be an array of strings.
-
-6. education must always be an array of objects.
-
-7. certifications must always be an array of objects.
-
-8. projects must always be an array of objects.
+6. education must always be an array.
+7. certifications must always be an array.
+8. projects must always be an array.
 
 Return ONLY valid JSON.
-
 Never include markdown.
-
 Never include explanations.
-
-If any value is unavailable:
-- "" for strings
-- [] for arrays
-- 0 for experience
 
 Resume:
 
@@ -106,41 +84,30 @@ ${resumeText}
       contents: prompt,
     });
 
-    if (!response) {
-      throw new Error("No response received from Gemini.");
-    }
-
-    if (!response.text) {
+    if (!response || !response.text) {
       throw new Error("Empty response received from Gemini.");
     }
 
     return response.text;
   } catch (error) {
-    // Debug logging
-    console.log("========== FULL GEMINI ERROR ==========");
-    console.dir(error, { depth: null });
-    console.log("=======================================");
+    console.error("========== RESUME PARSER ERROR ==========");
+    console.error(error);
+    console.error("=========================================");
 
     const message = String(error?.message || error);
 
-    // Quota exceeded
     if (
       message.includes("429") ||
       message.includes("RESOURCE_EXHAUSTED") ||
-      message.toLowerCase().includes("quota") ||
-      message.includes("GenerateRequestsPerDay") ||
-      message.includes("rate_limit")
+      message.toLowerCase().includes("quota")
     ) {
       throw new Error(
-        "AI resume parsing is temporarily unavailable because the Gemini API quota has been reached. Please try again later."
+        "AI resume parsing is temporarily unavailable because the Gemini API quota has been reached."
       );
     }
 
-    // Invalid API Key
     if (
       message.includes("API_KEY") ||
-      message.includes("API key") ||
-      message.includes("API_KEY_INVALID") ||
       message.includes("UNAUTHENTICATED")
     ) {
       throw new Error(
@@ -148,45 +115,133 @@ ${resumeText}
       );
     }
 
-    // Permission
     if (
-      message.includes("PERMISSION_DENIED") ||
-      message.includes("403")
+      message.includes("403") ||
+      message.includes("PERMISSION_DENIED")
     ) {
       throw new Error(
         "Access to the AI resume parsing service has been denied."
       );
     }
 
-    // Model not found
     if (
-      message.includes("NOT_FOUND") ||
-      message.includes("404")
+      message.includes("404") ||
+      message.includes("NOT_FOUND")
     ) {
       throw new Error(
-        "The configured Gemini model is not available for this project."
+        "Configured Gemini model not found."
       );
     }
 
-    // Network
-    if (
-      message.toLowerCase().includes("network") ||
-      message.toLowerCase().includes("fetch") ||
-      message.toLowerCase().includes("socket") ||
-      message.toLowerCase().includes("timeout")
-    ) {
-      throw new Error(
-        "Unable to connect to the AI resume parsing service. Please check your network connection."
-      );
-    }
-
-    // Fallback
     throw new Error(
-      "Unable to parse the resume at this time. Please try again later."
+      "Unable to parse the resume at this time."
     );
   }
 };
 
+// ======================================================
+// AI Candidate Matching
+// ======================================================
+
+const generateMatchAnalysis = async (candidate, job) => {
+  try {
+    const prompt = `
+You are an expert AI Recruitment Assistant.
+
+Compare the following candidate with the job.
+
+Candidate:
+
+${JSON.stringify(candidate, null, 2)}
+
+Job:
+
+${JSON.stringify(job, null, 2)}
+
+Return ONLY valid JSON.
+
+{
+  "matchScore": 0,
+  "matchingSkills": [],
+  "missingSkills": [],
+  "strengths": [],
+  "weaknesses": [],
+  "recommendation": "",
+  "summary": ""
+}
+
+Rules:
+
+- matchScore must be between 0 and 100.
+- matchingSkills should contain only skills present in both candidate and job.
+- missingSkills should contain important job skills missing from the candidate.
+- recommendation should be one of:
+  "Highly Recommended"
+  "Recommended"
+  "Consider"
+  "Not Recommended"
+
+Return ONLY JSON.
+Do not include markdown.
+Do not include explanations.
+`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+    });
+
+    if (!response || !response.text) {
+      throw new Error("Empty response received from Gemini.");
+    }
+
+    let analysisText = response.text;
+
+// Remove markdown code fences if Gemini returns them
+analysisText = analysisText
+  .replace(/```json/g, "")
+  .replace(/```/g, "")
+  .trim();
+
+let analysis;
+
+try {
+  analysis = JSON.parse(analysisText);
+} catch (err) {
+  throw new Error("Invalid JSON received from Gemini.");
+}
+const requiredFields = [
+  "matchScore",
+  "matchingSkills",
+  "missingSkills",
+  "strengths",
+  "weaknesses",
+  "recommendation",
+  "summary",
+];
+
+for (const field of requiredFields) {
+  if (!(field in analysis)) {
+    throw new Error(`Gemini response missing field: ${field}`);
+  }
+}
+return analysis;
+  } catch (error) {
+    console.error("========== MATCH ANALYSIS ERROR ==========");
+    console.error(error);
+    console.error("==========================================");
+
+    throw new Error(
+      "Unable to generate AI candidate matching analysis."
+    );
+  }
+};
+
+// ======================================================
+// Exports
+// ======================================================
+
 module.exports = {
   parseResume,
+  generateMatchAnalysis,
 };
