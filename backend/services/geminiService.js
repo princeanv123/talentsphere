@@ -240,8 +240,99 @@ return analysis;
 // ======================================================
 // Exports
 // ======================================================
+const generateCandidateRanking = async (
+  candidate,
+  candidateSkills,
+  job,
+  jobSkills
+) => {
 
+  const prompt = `
+You are an expert Technical Recruiter.
+
+Compare the following candidate against the job.
+
+Return ONLY valid JSON.
+
+Candidate Details:
+${JSON.stringify(candidate, null, 2)}
+
+Candidate Skills:
+${candidateSkills.join(", ")}
+
+Job Details:
+${JSON.stringify(job, null, 2)}
+
+Required Skills:
+${jobSkills.join(", ")}
+
+Return ONLY this JSON:
+
+{
+  "overallMatch": 0,
+  "strengths": [],
+  "gaps": [],
+  "recommendation": ""
+}
+
+Rules:
+
+overallMatch:
+Number between 0 and 100.
+
+strengths:
+Maximum 5 bullet points.
+
+gaps:
+Maximum 5 bullet points.
+
+recommendation:
+Choose ONLY one:
+
+"Highly Recommended"
+
+"Recommended"
+
+"Needs Review"
+
+"Not Recommended"
+
+Do not return markdown.
+Do not return explanations.
+Only JSON.
+`;
+
+try {
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+  });
+
+  if (!response || !response.text) {
+    throw new Error("Empty response received from Gemini.");
+  }
+
+  let text = response.text
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
+  return JSON.parse(text);
+
+} catch (error) {
+
+  console.error("========== CANDIDATE RANKING ERROR ==========");
+  console.error(error);
+  console.error("=============================================");
+
+  throw new Error(
+    "Unable to generate AI candidate ranking."
+  );
+}
+};
 module.exports = {
   parseResume,
   generateMatchAnalysis,
+  generateCandidateRanking,
 };

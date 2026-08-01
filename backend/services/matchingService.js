@@ -3,6 +3,7 @@ const { saveMatchHistory } = require("./matchHistoryService");
 const supabase = require("../config/supabase");
 const {
   generateMatchAnalysis,
+  generateCandidateRanking,
 } = require("./geminiService");
 
 // ======================================================
@@ -153,7 +154,12 @@ for (const candidate of candidates) {
       : Math.round(
           (matchingSkills.length / jobSkills.length) * 100
         );
-
+const aiRanking = await generateCandidateRanking(
+  candidate,
+  candidateSkills,
+  job,
+  jobSkills
+);
   candidatesWithSkills.push({
     ...candidate,
 
@@ -164,6 +170,8 @@ for (const candidate of candidates) {
     missingSkills,
 
     skillMatchPercentage,
+
+    aiRanking,
   });
 }
 candidatesWithSkills.sort(
