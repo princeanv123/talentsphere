@@ -123,16 +123,52 @@ const getCandidatesForJob = async (jobId) => {
   // Attach candidate skills
   const candidatesWithSkills = [];
 
-  for (const candidate of candidates) {
+for (const candidate of candidates) {
 
-    const candidateSkills = await getCandidateSkills(candidate.id);
+  const candidateSkills = await getCandidateSkills(candidate.id);
 
-    candidatesWithSkills.push({
-      ...candidate,
-      skills: candidateSkills,
-    });
-  }
+  // Normalize skills for comparison
+  const normalizedJobSkills = jobSkills.map(skill =>
+    skill.trim().toLowerCase()
+  );
 
+  const normalizedCandidateSkills = candidateSkills.map(skill =>
+    skill.trim().toLowerCase()
+  );
+
+  // Matching Skills
+  const matchingSkills = candidateSkills.filter(skill =>
+    normalizedJobSkills.includes(skill.trim().toLowerCase())
+  );
+
+  // Missing Skills
+  const missingSkills = jobSkills.filter(skill =>
+    !normalizedCandidateSkills.includes(skill.trim().toLowerCase())
+  );
+
+  // Skill Match Percentage
+  const skillMatchPercentage =
+    jobSkills.length === 0
+      ? 0
+      : Math.round(
+          (matchingSkills.length / jobSkills.length) * 100
+        );
+
+  candidatesWithSkills.push({
+    ...candidate,
+
+    skills: candidateSkills,
+
+    matchingSkills,
+
+    missingSkills,
+
+    skillMatchPercentage,
+  });
+}
+candidatesWithSkills.sort(
+  (a, b) => b.skillMatchPercentage - a.skillMatchPercentage
+);
   return {
     job,
     jobSkills,
@@ -140,7 +176,6 @@ const getCandidatesForJob = async (jobId) => {
     candidates: candidatesWithSkills,
   };
 };
-
 module.exports = {
   getMatchingScore,
   getCandidatesForJob,
