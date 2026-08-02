@@ -25,7 +25,9 @@ const resumeCompletenessRoutes = require("./routes/resumeCompletenessRoutes");
 const timelineConsistencyRoutes = require(
   "./routes/timelineConsistencyRoutes"
 );
-
+const resumeFraudDetectionRoutes = require(
+  "./routes/resumeFraudDetectionRoutes"
+);
 app.use(cors());
 app.use(express.json());
 app.use("/api/resumes", resumeRoutes);
@@ -42,7 +44,10 @@ app.use(
   "/api/timeline-consistency",
   timelineConsistencyRoutes
 );
-
+app.use(
+  "/api/resume-fraud-detection",
+  resumeFraudDetectionRoutes
+);
 console.log(
   "experienceConsistencyRoutes:",
   typeof experienceConsistencyRoutes

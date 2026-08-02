@@ -1,3 +1,7 @@
+
+const {
+  saveCandidateExperience,
+} = require("./candidateExperienceService");
 const { saveCandidateEducation } = require("./educationService");
 const { saveCandidateSkills } = require("./skillService");
 const { saveCandidateCertifications } = require("./certificationService");
@@ -5,6 +9,7 @@ const { uploadResumeFile } = require("./resumeUploadService");
 const { findOrCreateCandidate } = require("./candidateService");
 const { saveResumeHistory } = require("./resumeHistoryService");
 const resumeParser = require("./resumeParser");
+console.log("saveResumeHistory:", saveResumeHistory);
 const uploadResume = async (file) => {
 
 // ===============================
@@ -25,6 +30,19 @@ const uploadData = {
 
   console.log("========== Parsed Resume ==========");
   console.log(JSON.stringify(parsedData, null, 2));
+
+  console.log(
+  "Employment History Count:",
+  parsedData.employmentHistory?.length || 0
+);
+
+console.log(
+  JSON.stringify(
+    parsedData.employmentHistory,
+    null,
+    2
+  )
+);
   console.log("===================================");
 
   // ===============================
@@ -63,7 +81,12 @@ const {
       candidate.id,
       parsedData.certifications || []
     );
+console.log("Saving employment history...");
 
+await saveCandidateExperience(
+  candidate.id,
+  parsedData.employmentHistory || []
+);
     console.log("Candidate profile saved.");
   } else {
     console.log("Candidate already exists.");
@@ -73,6 +96,9 @@ const {
   // ===============================
   // Save Resume Metadata
   // ===============================
+  console.log("saveResumeHistory =", saveResumeHistory);
+console.log("typeof =", typeof saveResumeHistory);
+
 const resume = await saveResumeHistory(
   candidate.id,
   file,
