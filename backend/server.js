@@ -13,8 +13,13 @@ const matchingRoutes = require("./routes/matchingRoutes");
 const skillConsistencyRoutes = require(
   "./routes/skillConsistencyRoutes"
 );
+const experienceConsistencyRoutes = require(
+  "./routes/experienceConsistencyRoutes"
+);
 
-
+const resumeAuthenticityRoutes = require(
+  "./routes/resumeAuthenticityRoutes"
+);
 const app = express();
 const resumeCompletenessRoutes = require("./routes/resumeCompletenessRoutes");
 const timelineConsistencyRoutes = require(
@@ -37,11 +42,28 @@ app.use(
   "/api/timeline-consistency",
   timelineConsistencyRoutes
 );
+
+console.log(
+  "experienceConsistencyRoutes:",
+  typeof experienceConsistencyRoutes
+);
+console.log(
+  "experienceConsistencyRoutes value:",
+  experienceConsistencyRoutes
+);
+
+app.use(
+  "/api/experience-consistency",
+  experienceConsistencyRoutes
+);
 app.use(
   "/api/skill-consistency",
   skillConsistencyRoutes
 );
-
+app.use(
+  "/api/resume-authenticity",
+  resumeAuthenticityRoutes
+);
 app.get("/", (req, res) => {
   res.send("TalentSphere Backend is Running 🚀");
 });
