@@ -6,8 +6,9 @@ const {
   getCandidatesForJobController,
 } = require("../controllers/matchingController");
 
-
-console.log({ getMatchingScoreController });
+const {
+  analyzeCandidateController,
+} = require("../controllers/candidateAnalysisController");
 
 router.post("/score", getMatchingScoreController);
 
@@ -15,5 +16,8 @@ router.get(
   "/job/:jobId",
   getCandidatesForJobController
 );
-
+router.post(
+  "/analyze",
+  analyzeCandidateController
+);
 module.exports = router;

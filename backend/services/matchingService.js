@@ -154,12 +154,12 @@ for (const candidate of candidates) {
       : Math.round(
           (matchingSkills.length / jobSkills.length) * 100
         );
-const aiRanking = await generateCandidateRanking(
-  candidate,
-  candidateSkills,
-  job,
-  jobSkills
-);
+const aiRanking = {
+  overallMatch: null,
+  strengths: [],
+  gaps: [],
+  recommendation: "AI Disabled for Testing",
+};
   candidatesWithSkills.push({
     ...candidate,
 
