@@ -1,5 +1,8 @@
 
 const {
+  syncCurrentEmployment,
+} = require("./currentEmploymentService");
+const {
   saveCandidateExperience,
 } = require("./candidateExperienceService");
 const { saveCandidateEducation } = require("./educationService");
@@ -61,12 +64,19 @@ const {
   // Only for new candidates
   // ===============================
   if (isNewCandidate) {
-    console.log("Saving skills...");
+await saveCandidateExperience(
+  candidate.id,
+  parsedData.employmentHistory || []
+);
 
-    await saveCandidateSkills(
-      candidate.id,
-      parsedData.skills || []
-    );
+console.log("Synchronizing current employment...");
+
+await syncCurrentEmployment(
+  candidate.id,
+  parsedData.employmentHistory || []
+);
+
+console.log("Candidate profile saved.");
 
     console.log("Saving education...");
 

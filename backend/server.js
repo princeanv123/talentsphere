@@ -28,6 +28,10 @@ const timelineConsistencyRoutes = require(
 const resumeFraudDetectionRoutes = require(
   "./routes/resumeFraudDetectionRoutes"
 );
+const careerTimelineRoutes = require(
+  "./routes/careerTimelineRoutes"
+);
+
 app.use(cors());
 app.use(express.json());
 app.use("/api/resumes", resumeRoutes);
@@ -47,6 +51,10 @@ app.use(
 app.use(
   "/api/resume-fraud-detection",
   resumeFraudDetectionRoutes
+);
+app.use(
+  "/api/career-timeline",
+  careerTimelineRoutes
 );
 console.log(
   "experienceConsistencyRoutes:",
