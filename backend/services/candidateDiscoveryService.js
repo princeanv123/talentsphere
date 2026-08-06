@@ -11,7 +11,11 @@ const discoverCandidates = async (job) => {
     throw new Error("Unable to discover candidates.");
   }
 
-  return candidates;
+  console.log("======================================");
+console.log("Candidates Discovered:", candidates.length);
+console.log("======================================");
+
+return candidates;
 };
 
 module.exports = {

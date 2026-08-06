@@ -10,6 +10,7 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const jobRoutes = require("./routes/jobRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
 const matchingRoutes = require("./routes/matchingRoutes");
+
 const skillConsistencyRoutes = require(
   "./routes/skillConsistencyRoutes"
 );
@@ -31,6 +32,7 @@ const resumeFraudDetectionRoutes = require(
 const careerTimelineRoutes = require(
   "./routes/careerTimelineRoutes"
 );
+const authRoutes = require("./routes/authRoutes");
 
 app.use(cors());
 app.use(express.json());
@@ -77,6 +79,7 @@ app.use(
   "/api/resume-authenticity",
   resumeAuthenticityRoutes
 );
+app.use("/api/auth", authRoutes);
 app.get("/", (req, res) => {
   res.send("TalentSphere Backend is Running 🚀");
 });

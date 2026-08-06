@@ -36,7 +36,11 @@ const getCandidateProfile = async (candidateId) => {
     .select("*")
     .eq("candidate_id", candidateId);
 
-  // Projects
+    // Resume
+  const { data: resumes } = await supabase
+    .from("resumes")
+    .select("*")
+    .eq("candidate_id", candidateId);
   const { data: projects } = await supabase
     .from("projects")
     .select("*")

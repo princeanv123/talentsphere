@@ -17,6 +17,7 @@ const startCall = (prompt) => {
 
   return {
     estimatedTokens,
+    promptLength: prompt.length,
     startTime: Date.now(),
   };
 };
