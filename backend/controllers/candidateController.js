@@ -11,6 +11,9 @@ console.log({
 });
 const searchCandidate = async (req, res) => {
   try {
+    console.log("🔎 searchCandidate controller HIT");
+    console.log("Query:", req.query);
+
     const {
       keyword,
       location,
@@ -23,13 +26,17 @@ const searchCandidate = async (req, res) => {
       experience,
     });
 
-    res.status(200).json({
-      success: true,
-      count: candidates.length,
-      data: candidates,
-    });
+    console.log(
+      "✅ searchCandidates returned:",
+      candidates
+    );
+
+    res.json(candidates);
+
   } catch (error) {
-    console.error(error);
+    console.error("❌ Candidate search error:");
+    console.error("Message:", error.message);
+    console.error("Stack:", error.stack);
 
     res.status(500).json({
       success: false,

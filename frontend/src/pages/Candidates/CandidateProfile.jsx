@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getCandidateById } from "../../services/candidateService";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 export default function CandidateProfile() {
   const { id } = useParams();
@@ -225,16 +226,22 @@ export default function CandidateProfile() {
                     </p>
                   </div>
 
-                  {resume.file_url && (
-                    <a
-                      href={resume.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-red-600 hover:underline"
-                    >
-                      View Resume
-                    </a>
-                  )}
+{resume.file_url && (
+  <a
+    href={
+      resume.file_url.startsWith("http")
+        ? resume.file_url
+        : `${SUPABASE_URL}/storage/v1/object/public/resume-files/${encodeURI(
+            resume.file_url
+          )}`
+    }
+    target="_blank"
+    rel="noreferrer"
+    className="text-red-600 hover:underline"
+  >
+    View Resume
+  </a>
+)}
                 </div>
               ))}
             </div>
