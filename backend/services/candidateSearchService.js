@@ -72,14 +72,33 @@ const getCandidateById = async (candidateId) => {
   }
 
   // Candidate Skills
-  const { data: skills, error: skillsError } = await supabase
-    .from("candidate_skills")
-    .select("*")
-    .eq("candidate_id", candidateId);
+// Candidate Skills
+const { data: candidateSkills, error: skillsError } = await supabase
+  .from("candidate_skills")
+  .select("*")
+  .eq("candidate_id", candidateId);
 
-  if (skillsError) {
-    throw new Error(skillsError.message);
+if (skillsError) {
+  throw new Error(skillsError.message);
+}
+
+// Get actual skill names
+let skills = [];
+
+if (candidateSkills && candidateSkills.length > 0) {
+  const skillIds = candidateSkills.map((skill) => skill.skill_id);
+
+  const { data: skillDetails, error: skillDetailsError } = await supabase
+    .from("skills")
+    .select("id, skill_name, category")
+    .in("id", skillIds);
+
+  if (skillDetailsError) {
+    throw new Error(skillDetailsError.message);
   }
+
+  skills = skillDetails || [];
+}
 
   // Candidate Education
   const { data: education, error: educationError } = await supabase
