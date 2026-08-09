@@ -31,27 +31,16 @@ const searchCandidates = async ({
     .select("*");
 
   // ========================================
-  // Keyword Search
-  // Searches:
-  // 1. Candidate Name
-  // 2. Candidate Email
-  // 3. Candidate Skills
-  // 4. Current Role Title
-  // 5. Historical Role Titles
+  // KEYWORD SEARCH
   // ========================================
 
   if (keyword) {
-    // --------------------------------------
-    // Clean search term
-    // --------------------------------------
-
     let searchTerm = keyword.trim();
 
+    // --------------------------------------
     // Remove surrounding double quotes
-    // Example:
-    // "Infrastructure Engineer"
-    // becomes:
-    // Infrastructure Engineer
+    // --------------------------------------
+
     if (
       searchTerm.startsWith('"') &&
       searchTerm.endsWith('"')
@@ -59,11 +48,10 @@ const searchCandidates = async ({
       searchTerm = searchTerm.slice(1, -1).trim();
     }
 
+    // --------------------------------------
     // Remove surrounding single quotes
-    // Example:
-    // 'Project Manager'
-    // becomes:
-    // Project Manager
+    // --------------------------------------
+
     if (
       searchTerm.startsWith("'") &&
       searchTerm.endsWith("'")
@@ -71,9 +59,18 @@ const searchCandidates = async ({
       searchTerm = searchTerm.slice(1, -1).trim();
     }
 
-    // --------------------------------------
-    // Search Candidate Name
-    // --------------------------------------
+    // If nothing remains after cleaning
+    if (!searchTerm) {
+      return [];
+    }
+
+    console.log("======================================");
+    console.log("Candidate Keyword Search:", searchTerm);
+    console.log("======================================");
+
+    // ======================================
+    // 1. Candidate Name
+    // ======================================
 
     const {
       data: nameMatches,
@@ -81,15 +78,18 @@ const searchCandidates = async ({
     } = await supabase
       .from("candidates")
       .select("id")
-      .ilike("full_name", `%${searchTerm}%`);
+      .ilike(
+        "full_name",
+        `%${searchTerm}%`
+      );
 
     if (nameError) {
       throw new Error(nameError.message);
     }
 
-    // --------------------------------------
-    // Search Candidate Email
-    // --------------------------------------
+    // ======================================
+    // 2. Candidate Email
+    // ======================================
 
     const {
       data: emailMatches,
@@ -97,16 +97,98 @@ const searchCandidates = async ({
     } = await supabase
       .from("candidates")
       .select("id")
-      .ilike("email", `%${searchTerm}%`);
+      .ilike(
+        "email",
+        `%${searchTerm}%`
+      );
 
     if (emailError) {
       throw new Error(emailError.message);
     }
 
-    // --------------------------------------
-    // Search Skills
-    // skills.skill_name
-    // --------------------------------------
+    // ======================================
+    // 3. Candidate Location
+    // ======================================
+
+    const {
+      data: locationMatches,
+      error: locationError,
+    } = await supabase
+      .from("candidates")
+      .select("id")
+      .ilike(
+        "location",
+        `%${searchTerm}%`
+      );
+
+    if (locationError) {
+      throw new Error(locationError.message);
+    }
+
+    // ======================================
+    // 4. Candidate Summary
+    // ======================================
+
+    const {
+      data: summaryMatches,
+      error: summaryError,
+    } = await supabase
+      .from("candidates")
+      .select("id")
+      .ilike(
+        "summary",
+        `%${searchTerm}%`
+      );
+
+    if (summaryError) {
+      throw new Error(summaryError.message);
+    }
+
+    // ======================================
+    // 5. Current Company
+    // ======================================
+
+    const {
+      data: currentCompanyMatches,
+      error: currentCompanyError,
+    } = await supabase
+      .from("candidates")
+      .select("id")
+      .ilike(
+        "current_company",
+        `%${searchTerm}%`
+      );
+
+    if (currentCompanyError) {
+      throw new Error(
+        currentCompanyError.message
+      );
+    }
+
+    // ======================================
+    // 6. Current Role Title
+    // ======================================
+
+    const {
+      data: currentTitleMatches,
+      error: currentTitleError,
+    } = await supabase
+      .from("candidates")
+      .select("id")
+      .ilike(
+        "current_title",
+        `%${searchTerm}%`
+      );
+
+    if (currentTitleError) {
+      throw new Error(
+        currentTitleError.message
+      );
+    }
+
+    // ======================================
+    // 7. Skills
+    // ======================================
 
     const {
       data: skillMatches,
@@ -114,19 +196,25 @@ const searchCandidates = async ({
     } = await supabase
       .from("skills")
       .select("id")
-      .ilike("skill_name", `%${searchTerm}%`);
+      .ilike(
+        "skill_name",
+        `%${searchTerm}%`
+      );
 
     if (skillError) {
       throw new Error(skillError.message);
     }
 
-    // --------------------------------------
-    // Find Candidates Having Matching Skills
-    // --------------------------------------
+    // ======================================
+    // Candidates Having Matching Skills
+    // ======================================
 
     let skillCandidateMatches = [];
 
-    if (skillMatches && skillMatches.length > 0) {
+    if (
+      skillMatches &&
+      skillMatches.length > 0
+    ) {
       const skillIds = skillMatches.map(
         (skill) => skill.id
       );
@@ -140,53 +228,42 @@ const searchCandidates = async ({
         .in("skill_id", skillIds);
 
       if (candidateSkillError) {
-        throw new Error(candidateSkillError.message);
+        throw new Error(
+          candidateSkillError.message
+        );
       }
 
       skillCandidateMatches =
         candidateSkillMatches || [];
     }
 
-    // --------------------------------------
-    // Search CURRENT Role Title
-    // candidates.current_title
-    // --------------------------------------
+    // ======================================
+    // 8. Historical Company Name
+    // ======================================
 
     const {
-      data: currentTitleData,
-      error: currentTitleError,
+      data: experienceCompanyMatches,
+      error: experienceCompanyError,
     } = await supabase
-      .from("candidates")
-      .select("id")
+      .from("candidate_experience")
+      .select("candidate_id")
       .ilike(
-        "current_title",
+        "company_name",
         `%${searchTerm}%`
       );
 
-    if (currentTitleError) {
-      throw new Error(currentTitleError.message);
+    if (experienceCompanyError) {
+      throw new Error(
+        experienceCompanyError.message
+      );
     }
 
-    const currentTitleMatches =
-      currentTitleData || [];
-
-    // --------------------------------------
-    // Search HISTORICAL Role Titles
-    // candidate_experience.job_title
-    //
-    // Example:
-    //
-    // Search:
-    // Infrastructure Engineer
-    //
-    // Matches:
-    // Infrastructure Engineer
-    // Cloud Infrastructure Engineer
-    // Senior Infrastructure Engineer
-    // --------------------------------------
+    // ======================================
+    // 9. Historical Job Title
+    // ======================================
 
     const {
-      data: experienceTitleData,
+      data: experienceTitleMatches,
       error: experienceTitleError,
     } = await supabase
       .from("candidate_experience")
@@ -202,60 +279,292 @@ const searchCandidates = async ({
       );
     }
 
-    const experienceTitleMatches =
-      experienceTitleData || [];
+    // ======================================
+    // 10. Historical Technologies
+    // ======================================
 
-    // --------------------------------------
-    // Combine Candidate IDs
-    // --------------------------------------
+    const {
+      data: technologyMatches,
+      error: technologyError,
+    } = await supabase
+      .from("candidate_experience")
+      .select("candidate_id")
+      .ilike(
+        "technologies",
+        `%${searchTerm}%`
+      );
+
+    if (technologyError) {
+      throw new Error(
+        technologyError.message
+      );
+    }
+
+    // ======================================
+    // 11. Historical Responsibilities
+    // ======================================
+
+    const {
+      data: responsibilityMatches,
+      error: responsibilityError,
+    } = await supabase
+      .from("candidate_experience")
+      .select("candidate_id")
+      .ilike(
+        "responsibilities",
+        `%${searchTerm}%`
+      );
+
+    if (responsibilityError) {
+      throw new Error(
+        responsibilityError.message
+      );
+    }
+
+    // ======================================
+    // 12. Historical Employment Location
+    // ======================================
+
+    const {
+      data: experienceLocationMatches,
+      error: experienceLocationError,
+    } = await supabase
+      .from("candidate_experience")
+      .select("candidate_id")
+      .ilike(
+        "location",
+        `%${searchTerm}%`
+      );
+
+    if (experienceLocationError) {
+      throw new Error(
+        experienceLocationError.message
+      );
+    }
+
+    // ======================================
+    // 13. Education - Degree
+    // ======================================
+
+    const {
+      data: educationDegreeMatches,
+      error: educationDegreeError,
+    } = await supabase
+      .from("education")
+      .select("candidate_id")
+      .ilike(
+        "degree",
+        `%${searchTerm}%`
+      );
+
+    if (educationDegreeError) {
+      throw new Error(
+        educationDegreeError.message
+      );
+    }
+
+    // ======================================
+    // 14. Education - Institution
+    // ======================================
+
+    const {
+      data: educationInstitutionMatches,
+      error: educationInstitutionError,
+    } = await supabase
+      .from("education")
+      .select("candidate_id")
+      .ilike(
+        "institution",
+        `%${searchTerm}%`
+      );
+
+    if (educationInstitutionError) {
+      throw new Error(
+        educationInstitutionError.message
+      );
+    }
+
+    // ======================================
+    // 15. Education - Field of Study
+    // ======================================
+
+    const {
+      data: educationFieldMatches,
+      error: educationFieldError,
+    } = await supabase
+      .from("education")
+      .select("candidate_id")
+      .ilike(
+        "field_of_study",
+        `%${searchTerm}%`
+      );
+
+    if (educationFieldError) {
+      throw new Error(
+        educationFieldError.message
+      );
+    }
+
+    // ======================================
+    // 16. Certifications - Name
+    // ======================================
+
+    const {
+      data: certificationMatches,
+      error: certificationError,
+    } = await supabase
+      .from("certifications")
+      .select("candidate_id")
+      .ilike(
+        "certification_name",
+        `%${searchTerm}%`
+      );
+
+    if (certificationError) {
+      throw new Error(
+        certificationError.message
+      );
+    }
+
+    // ======================================
+    // 17. Certifications - Organization
+    // ======================================
+
+    const {
+      data: certificationOrgMatches,
+      error: certificationOrgError,
+    } = await supabase
+      .from("certifications")
+      .select("candidate_id")
+      .ilike(
+        "issuing_organization",
+        `%${searchTerm}%`
+      );
+
+    if (certificationOrgError) {
+      throw new Error(
+        certificationOrgError.message
+      );
+    }
+
+    // ======================================
+    // COMBINE ALL CANDIDATE IDs
+    // ======================================
 
     const candidateIds = [
-      // Name matches
+
+      // Candidate
       ...(nameMatches || []).map(
         (candidate) => candidate.id
       ),
 
-      // Email matches
       ...(emailMatches || []).map(
         (candidate) => candidate.id
       ),
 
-      // Skill matches
-      ...skillCandidateMatches.map(
-        (candidate) => candidate.candidate_id
+      ...(locationMatches || []).map(
+        (candidate) => candidate.id
       ),
 
-      // Current title matches
+      ...(summaryMatches || []).map(
+        (candidate) => candidate.id
+      ),
+
+      // Current employment
+      ...(currentCompanyMatches || []).map(
+        (candidate) => candidate.id
+      ),
+
       ...(currentTitleMatches || []).map(
         (candidate) => candidate.id
       ),
 
-      // Historical title matches
+      // Skills
+      ...skillCandidateMatches.map(
+        (candidate) =>
+          candidate.candidate_id
+      ),
+
+      // Historical employment
+      ...(experienceCompanyMatches || []).map(
+        (candidate) =>
+          candidate.candidate_id
+      ),
+
       ...(experienceTitleMatches || []).map(
-        (candidate) => candidate.candidate_id
+        (candidate) =>
+          candidate.candidate_id
+      ),
+
+      ...(technologyMatches || []).map(
+        (candidate) =>
+          candidate.candidate_id
+      ),
+
+      ...(responsibilityMatches || []).map(
+        (candidate) =>
+          candidate.candidate_id
+      ),
+
+      ...(experienceLocationMatches || []).map(
+        (candidate) =>
+          candidate.candidate_id
+      ),
+
+      // Education
+      ...(educationDegreeMatches || []).map(
+        (candidate) =>
+          candidate.candidate_id
+      ),
+
+      ...(educationInstitutionMatches || []).map(
+        (candidate) =>
+          candidate.candidate_id
+      ),
+
+      ...(educationFieldMatches || []).map(
+        (candidate) =>
+          candidate.candidate_id
+      ),
+
+      // Certifications
+      ...(certificationMatches || []).map(
+        (candidate) =>
+          candidate.candidate_id
+      ),
+
+      ...(certificationOrgMatches || []).map(
+        (candidate) =>
+          candidate.candidate_id
       ),
     ];
 
-    // --------------------------------------
-    // Remove Duplicate Candidate IDs
-    // --------------------------------------
+    // ======================================
+    // REMOVE DUPLICATE CANDIDATE IDs
+    // ======================================
 
     const uniqueCandidateIds = [
       ...new Set(candidateIds),
     ];
 
-    // --------------------------------------
-    // If Keyword Didn't Match Anything
-    // --------------------------------------
+    console.log(
+      "Matching Candidate IDs:",
+      uniqueCandidateIds
+    );
 
-    if (uniqueCandidateIds.length === 0) {
+    // ======================================
+    // No Keyword Matches
+    // ======================================
+
+    if (
+      uniqueCandidateIds.length === 0
+    ) {
       return [];
     }
 
-    // --------------------------------------
-    // Restrict Main Candidate Query
-    // to Matching Candidates
-    // --------------------------------------
+    // ======================================
+    // Restrict Main Query
+    // ======================================
 
     query = query.in(
       "id",
@@ -276,10 +585,12 @@ const searchCandidates = async ({
 
   // ========================================
   // Experience Filter
-  // Minimum Years of Experience
   // ========================================
 
-  if (experience !== undefined && experience !== null) {
+  if (
+    experience !== undefined &&
+    experience !== null
+  ) {
     query = query.gte(
       "experience",
       experience
@@ -287,15 +598,18 @@ const searchCandidates = async ({
   }
 
   // ========================================
-  // Execute Final Candidate Query
+  // Execute Final Query
   // ========================================
 
   const {
     data,
     error,
-  } = await query.order("experience", {
-    ascending: false,
-  });
+  } = await query.order(
+    "experience",
+    {
+      ascending: false,
+    }
+  );
 
   if (error) {
     throw new Error(error.message);
@@ -311,6 +625,7 @@ const searchCandidates = async ({
 const getCandidateById = async (
   candidateId
 ) => {
+
   // --------------------------------------
   // Candidate Details
   // --------------------------------------
@@ -358,9 +673,11 @@ const getCandidateById = async (
     candidateSkills &&
     candidateSkills.length > 0
   ) {
-    const skillIds = candidateSkills.map(
-      (skill) => skill.skill_id
-    );
+
+    const skillIds =
+      candidateSkills.map(
+        (skill) => skill.skill_id
+      );
 
     const {
       data: skillDetails,
@@ -428,9 +745,12 @@ const getCandidateById = async (
     .from("resumes")
     .select("*")
     .eq("candidate_id", candidateId)
-    .order("uploaded_at", {
-      ascending: false,
-    });
+    .order(
+      "uploaded_at",
+      {
+        ascending: false,
+      }
+    );
 
   if (resumeHistoryError) {
     throw new Error(
@@ -459,6 +779,7 @@ const updateCandidate = async (
   candidateId,
   data
 ) => {
+
   const updateData = {};
 
   // --------------------------------------
@@ -502,6 +823,7 @@ const updateCandidate = async (
   // --------------------------------------
 
   if (data.experience !== undefined) {
+
     const experience = Number(
       data.experience
     );

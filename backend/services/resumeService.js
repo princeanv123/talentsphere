@@ -1,130 +1,243 @@
-
 const {
   syncCurrentEmployment,
 } = require("./currentEmploymentService");
+
 const {
   saveCandidateExperience,
 } = require("./candidateExperienceService");
-const { saveCandidateEducation } = require("./educationService");
-const { saveCandidateSkills } = require("./skillService");
-const { saveCandidateCertifications } = require("./certificationService");
-const { uploadResumeFile } = require("./resumeUploadService");
-const { findOrCreateCandidate } = require("./candidateService");
-const { saveResumeHistory } = require("./resumeHistoryService");
+
+const {
+  saveCandidateEducation,
+} = require("./educationService");
+
+const {
+  saveCandidateSkills,
+} = require("./skillService");
+
+const {
+  saveCandidateCertifications,
+} = require("./certificationService");
+
+const {
+  uploadResumeFile,
+} = require("./resumeUploadService");
+
+const {
+  findOrCreateCandidate,
+} = require("./candidateService");
+
+const {
+  saveResumeHistory,
+} = require("./resumeHistoryService");
+
 const resumeParser = require("./resumeParser");
-console.log("saveResumeHistory:", saveResumeHistory);
+
+console.log("resumeService.js loaded");
+
+
+// ======================================================
+// Upload + Parse + Save Resume
+// ======================================================
+
 const uploadResume = async (file) => {
 
-// ===============================
-// Upload Resume to Supabase Storage
-// ===============================
-const uploadResult = await uploadResumeFile(file);
+  // ====================================================
+  // STEP 1: Upload Resume to Supabase Storage
+  // ====================================================
 
-const fileType = uploadResult.fileType;
+  console.log("======================================");
+  console.log("STEP 1: Uploading resume...");
+  console.log("File:", file.originalname);
+  console.log("======================================");
 
-const uploadData = {
-  path: uploadResult.storagePath,
-};
+  const uploadResult = await uploadResumeFile(file);
 
-  // ===============================
-  // Parse Resume
-  // ===============================
+  const fileType = uploadResult.fileType;
+
+  const uploadData = {
+    path: uploadResult.storagePath,
+  };
+
+  console.log("Resume uploaded to storage:");
+  console.log(uploadData.path);
+
+
+  // ====================================================
+  // STEP 2: Parse Resume
+  // ====================================================
+
+  console.log("======================================");
+  console.log("STEP 2: Parsing resume...");
+  console.log("======================================");
+
   const parsedData = await resumeParser(file);
 
-  console.log("========== Parsed Resume ==========");
-  console.log(JSON.stringify(parsedData, null, 2));
+  console.log("========== PARSED RESUME JSON ==========");
+  console.log(
+    JSON.stringify(parsedData, null, 2)
+  );
+  console.log("=========================================");
+
+
+  // ====================================================
+  // STEP 3: Find Existing Candidate OR Create New
+  // ====================================================
+
+  console.log("======================================");
+  console.log("STEP 3: Finding / Creating candidate...");
+  console.log("======================================");
+
+  const {
+    candidate,
+    isNewCandidate,
+  } = await findOrCreateCandidate(
+    parsedData,
+    uploadData.path
+  );
 
   console.log(
-  "Employment History Count:",
-  parsedData.employmentHistory?.length || 0
-);
+    isNewCandidate
+      ? "New candidate created."
+      : "Existing candidate found."
+  );
 
-console.log(
-  JSON.stringify(
-    parsedData.employmentHistory,
-    null,
-    2
-  )
-);
-  console.log("===================================");
 
-  // ===============================
-  // Check if Candidate already exists
-  // ===============================
-const {
-  candidate,
-  isNewCandidate,
-} = await findOrCreateCandidate(
-  parsedData,
-  uploadData.path
-);
+  // ====================================================
+  // STEP 4: Save Candidate Profile Data
+  // Only for NEW candidates
+  // ====================================================
 
-  // ===============================
-  // Save Profile Information
-  // Only for new candidates
-  // ===============================
   if (isNewCandidate) {
-await saveCandidateExperience(
-  candidate.id,
-  parsedData.employmentHistory || []
-);
 
-console.log("Synchronizing current employment...");
+    // --------------------------------------------------
+    // Employment History
+    // --------------------------------------------------
 
-await syncCurrentEmployment(
-  candidate.id,
-  parsedData.employmentHistory || []
-);
+    console.log("======================================");
+    console.log("Saving employment history...");
+    console.log("======================================");
 
-console.log("Candidate profile saved.");
+    await saveCandidateExperience(
+      candidate.id,
+      parsedData.employmentHistory || []
+    );
 
+    console.log("Employment history saved.");
+
+
+    // --------------------------------------------------
+    // Current Employment
+    // --------------------------------------------------
+
+    console.log("Synchronizing current employment...");
+
+    await syncCurrentEmployment(
+      candidate.id,
+      parsedData.employmentHistory || []
+    );
+
+    console.log("Current employment synchronized.");
+
+
+    // --------------------------------------------------
+    // Skills
+    // --------------------------------------------------
+
+    console.log("======================================");
+    console.log("Saving skills...");
+    console.log("======================================");
+
+    await saveCandidateSkills(
+      candidate.id,
+      parsedData.skills || []
+    );
+
+    console.log("Skills saved.");
+
+
+    // --------------------------------------------------
+    // Education
+    // --------------------------------------------------
+
+    console.log("======================================");
     console.log("Saving education...");
+    console.log("======================================");
 
     await saveCandidateEducation(
       candidate.id,
       parsedData.education || []
     );
 
+    console.log("Education saved.");
+
+
+    // --------------------------------------------------
+    // Certifications
+    // --------------------------------------------------
+
+    console.log("======================================");
     console.log("Saving certifications...");
+    console.log("======================================");
 
     await saveCandidateCertifications(
       candidate.id,
       parsedData.certifications || []
     );
-console.log("Saving employment history...");
 
-await saveCandidateExperience(
-  candidate.id,
-  parsedData.employmentHistory || []
-);
-    console.log("Candidate profile saved.");
+    console.log("Certifications saved.");
+
+
+    console.log("======================================");
+    console.log("Candidate profile saved successfully.");
+    console.log("======================================");
+
   } else {
-    console.log("Candidate already exists.");
-    console.log("Skipping Skills / Education / Certifications.");
+
+    console.log(
+      "Candidate already exists."
+    );
+
+    console.log(
+      "Skipping profile child-record creation."
+    );
   }
 
-  // ===============================
-  // Save Resume Metadata
-  // ===============================
-  console.log("saveResumeHistory =", saveResumeHistory);
-console.log("typeof =", typeof saveResumeHistory);
 
-const resume = await saveResumeHistory(
-  candidate.id,
-  file,
-  uploadData.path,
-  fileType
-);
+  // ====================================================
+  // STEP 5: Save Resume Metadata
+  // ====================================================
+
+  console.log("======================================");
+  console.log("STEP 5: Saving resume history...");
+  console.log("======================================");
+
+  const resume = await saveResumeHistory(
+    candidate.id,
+    file,
+    uploadData.path,
+    fileType
+  );
+
+  console.log("Resume history saved.");
+
+
+  // ====================================================
+  // STEP 6: Return Result
+  // ====================================================
 
   return {
     success: true,
+
     message: isNewCandidate
       ? "Candidate created successfully."
       : "Candidate already exists. Resume uploaded successfully.",
+
     candidate,
+
     resume,
   };
 };
+
 
 module.exports = {
   uploadResume,
