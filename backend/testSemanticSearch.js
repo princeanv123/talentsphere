@@ -20,9 +20,9 @@ const test = async () => {
     // ============================================
 
     const query = `
-      Cloud Infrastructure Engineer with experience in AWS,
-      GCP, Terraform, Ansible, Docker, Kubernetes,
-      cloud migration and CI/CD.
+  Pediatric Cardiologist with extensive experience
+  in cardiac surgery, echocardiography, pediatric heart
+  transplantation, congenital heart disease and ICU care.
     `;
 
     console.log("======================================");

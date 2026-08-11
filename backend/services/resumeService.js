@@ -38,25 +38,56 @@ const resumeParser = require("./resumeParser");
 
 console.log("resumeService.js loaded");
 
+
 // ======================================================
-// Build Candidate Content for Semantic Search
+// Build Candidate Embedding Content
 // ======================================================
 
 const buildCandidateEmbeddingContent = (parsedData) => {
-  const skills = Array.isArray(parsedData.skills)
-    ? parsedData.skills.join(", ")
-    : "";
 
-  const employmentHistory = Array.isArray(
-    parsedData.employmentHistory
-  )
-    ? parsedData.employmentHistory
-        .map((job) => JSON.stringify(job))
-        .join(" ")
-    : "";
+  const formatArray = (value) => {
+
+    if (!Array.isArray(value)) {
+      return "";
+    }
+
+    return value
+      .map((item) => {
+
+        if (typeof item === "string") {
+          return item;
+        }
+
+        return JSON.stringify(item);
+
+      })
+      .join("\n");
+  };
+
+
+  const skills = formatArray(
+    parsedData.skills
+  );
+
+  const education = formatArray(
+    parsedData.education
+  );
+
+  const certifications = formatArray(
+    parsedData.certifications
+  );
+
+  const projects = formatArray(
+    parsedData.projects
+  );
+
 
   return `
-Candidate Name: ${parsedData.name || ""}
+Candidate Name:
+${parsedData.name || ""}
+
+Location:
+${parsedData.location || ""}
 
 Professional Summary:
 ${parsedData.summary || ""}
@@ -67,10 +98,17 @@ ${parsedData.experience || ""} years
 Skills:
 ${skills}
 
-Employment History:
-${employmentHistory}
+Education:
+${education}
+
+Certifications:
+${certifications}
+
+Projects:
+${projects}
 `.trim();
 };
+
 
 // ======================================================
 // Upload + Parse + Save Resume
@@ -87,16 +125,24 @@ const uploadResume = async (file) => {
   console.log("File:", file.originalname);
   console.log("======================================");
 
-  const uploadResult = await uploadResumeFile(file);
+  const uploadResult =
+    await uploadResumeFile(file);
 
-  const fileType = uploadResult.fileType;
+  const fileType =
+    uploadResult.fileType;
 
   const uploadData = {
     path: uploadResult.storagePath,
   };
 
-  console.log("Resume uploaded to storage:");
-  console.log(uploadData.path);
+  console.log(
+    "Resume uploaded to storage:"
+  );
+
+  console.log(
+    uploadData.path
+  );
+
 
   // ====================================================
   // STEP 2: Parse Resume
@@ -106,29 +152,44 @@ const uploadResume = async (file) => {
   console.log("STEP 2: Parsing resume...");
   console.log("======================================");
 
-  const parsedData = await resumeParser(file);
+  const parsedData =
+    await resumeParser(file);
 
-  console.log("========== PARSED RESUME JSON ==========");
   console.log(
-    JSON.stringify(parsedData, null, 2)
+    "========== PARSED RESUME JSON =========="
   );
-  console.log("=========================================");
+
+  console.log(
+    JSON.stringify(
+      parsedData,
+      null,
+      2
+    )
+  );
+
+  console.log(
+    "========================================="
+  );
+
 
   // ====================================================
   // STEP 3: Find Existing Candidate OR Create New
   // ====================================================
 
   console.log("======================================");
-  console.log("STEP 3: Finding / Creating candidate...");
+  console.log(
+    "STEP 3: Finding / Creating candidate..."
+  );
   console.log("======================================");
 
   const {
     candidate,
     isNewCandidate,
-  } = await findOrCreateCandidate(
-    parsedData,
-    uploadData.path
-  );
+  } =
+    await findOrCreateCandidate(
+      parsedData,
+      uploadData.path
+    );
 
   console.log(
     isNewCandidate
@@ -136,8 +197,56 @@ const uploadResume = async (file) => {
       : "Existing candidate found."
   );
 
+
   // ====================================================
-  // STEP 4: Save Candidate Profile Data
+  // STEP 4: Generate / Update Candidate Embedding
+  // ====================================================
+
+  console.log("======================================");
+  console.log(
+    "STEP 4: Generating candidate embedding..."
+  );
+  console.log("======================================");
+
+  const embeddingContent =
+    buildCandidateEmbeddingContent(
+      parsedData
+    );
+
+
+  // ----------------------------------------------------
+  // Display exact content being converted into vector
+  // ----------------------------------------------------
+
+  console.log(
+    "========== EMBEDDING CONTENT =========="
+  );
+
+  console.log(
+    embeddingContent
+  );
+
+  console.log(
+    "========================================"
+  );
+
+
+  // ----------------------------------------------------
+  // Generate and save/update embedding
+  // ----------------------------------------------------
+
+  await saveCandidateEmbedding(
+    candidate.id,
+    embeddingContent
+  );
+
+  console.log(
+    "Candidate embedding saved/updated successfully."
+  );
+
+
+  // ====================================================
+  // STEP 5: Save Candidate Profile Data
   // Only for NEW candidates
   // ====================================================
 
@@ -148,7 +257,9 @@ const uploadResume = async (file) => {
     // --------------------------------------------------
 
     console.log("======================================");
-    console.log("Saving employment history...");
+    console.log(
+      "Saving employment history..."
+    );
     console.log("======================================");
 
     await saveCandidateExperience(
@@ -156,27 +267,37 @@ const uploadResume = async (file) => {
       parsedData.employmentHistory || []
     );
 
-    console.log("Employment history saved.");
+    console.log(
+      "Employment history saved."
+    );
+
 
     // --------------------------------------------------
     // Current Employment
     // --------------------------------------------------
 
-    console.log("Synchronizing current employment...");
+    console.log(
+      "Synchronizing current employment..."
+    );
 
     await syncCurrentEmployment(
       candidate.id,
       parsedData.employmentHistory || []
     );
 
-    console.log("Current employment synchronized.");
+    console.log(
+      "Current employment synchronized."
+    );
+
 
     // --------------------------------------------------
     // Skills
     // --------------------------------------------------
 
     console.log("======================================");
-    console.log("Saving skills...");
+    console.log(
+      "Saving skills..."
+    );
     console.log("======================================");
 
     await saveCandidateSkills(
@@ -184,14 +305,19 @@ const uploadResume = async (file) => {
       parsedData.skills || []
     );
 
-    console.log("Skills saved.");
+    console.log(
+      "Skills saved."
+    );
+
 
     // --------------------------------------------------
     // Education
     // --------------------------------------------------
 
     console.log("======================================");
-    console.log("Saving education...");
+    console.log(
+      "Saving education..."
+    );
     console.log("======================================");
 
     await saveCandidateEducation(
@@ -199,14 +325,19 @@ const uploadResume = async (file) => {
       parsedData.education || []
     );
 
-    console.log("Education saved.");
+    console.log(
+      "Education saved."
+    );
+
 
     // --------------------------------------------------
     // Certifications
     // --------------------------------------------------
 
     console.log("======================================");
-    console.log("Saving certifications...");
+    console.log(
+      "Saving certifications..."
+    );
     console.log("======================================");
 
     await saveCandidateCertifications(
@@ -214,35 +345,22 @@ const uploadResume = async (file) => {
       parsedData.certifications || []
     );
 
-    console.log("Certifications saved.");
-
-    // --------------------------------------------------
-    // Candidate Profile Complete
-    // --------------------------------------------------
-
-    console.log("======================================");
-    console.log("Candidate profile saved successfully.");
-    console.log("======================================");
-
-    // --------------------------------------------------
-    // Semantic Search Embedding
-    // --------------------------------------------------
-
-    console.log("======================================");
-    console.log("Generating candidate embedding...");
-    console.log("======================================");
-
-    const embeddingContent =
-      buildCandidateEmbeddingContent(parsedData);
-
-    console.log("Embedding content prepared.");
-
-    await saveCandidateEmbedding(
-      candidate.id,
-      embeddingContent
+    console.log(
+      "Certifications saved."
     );
 
-    console.log("Candidate embedding saved successfully.");
+
+    console.log(
+      "======================================"
+    );
+
+    console.log(
+      "Candidate profile saved successfully."
+    );
+
+    console.log(
+      "======================================"
+    );
 
   } else {
 
@@ -255,28 +373,39 @@ const uploadResume = async (file) => {
     );
   }
 
+
   // ====================================================
-  // STEP 5: Save Resume Metadata
+  // STEP 6: Save Resume Metadata
   // ====================================================
 
   console.log("======================================");
-  console.log("STEP 5: Saving resume history...");
-  console.log("======================================");
 
-  const resume = await saveResumeHistory(
-    candidate.id,
-    file,
-    uploadData.path,
-    fileType
+  console.log(
+    "STEP 6: Saving resume history..."
   );
 
-  console.log("Resume history saved.");
+  console.log(
+    "======================================");
+
+  const resume =
+    await saveResumeHistory(
+      candidate.id,
+      file,
+      uploadData.path,
+      fileType
+    );
+
+  console.log(
+    "Resume history saved."
+  );
+
 
   // ====================================================
-  // STEP 6: Return Result
+  // STEP 7: Return Result
   // ====================================================
 
   return {
+
     success: true,
 
     message: isNewCandidate
@@ -288,6 +417,11 @@ const uploadResume = async (file) => {
     resume,
   };
 };
+
+
+// ======================================================
+// Export
+// ======================================================
 
 module.exports = {
   uploadResume,
