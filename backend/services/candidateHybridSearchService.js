@@ -1,3 +1,4 @@
+const supabase = require("../config/supabase");
 const {
   searchCandidates,
 } = require("./candidateSearchService");
@@ -207,8 +208,55 @@ const searchCandidatesHybrid = async ({
       );
     }
   }
-
   // ====================================================
+  // STEP 4.5: Enrich Candidates
+  // ====================================================
+
+  console.log(
+    "STEP 4.5: Fetching complete candidate records..."
+  );
+
+  const candidateIds =
+    Array.from(candidateMap.keys());
+
+  let candidateDetailsMap = new Map();
+
+  if (candidateIds.length > 0) {
+
+    const {
+      data: candidateDetails,
+      error: candidateDetailsError,
+    } = await supabase
+      .from("candidates")
+      .select("*")
+      .in("id", candidateIds);
+
+    if (candidateDetailsError) {
+      throw new Error(
+        candidateDetailsError.message
+      );
+    }
+
+    candidateDetailsMap =
+      new Map(
+        (candidateDetails || []).map(
+          (candidate) => [
+            candidate.id,
+            candidate,
+          ]
+        )
+      );
+  }
+
+  console.log(
+    "Candidate records fetched:",
+    candidateDetailsMap.size
+  );
+  // ====================================================
+  // STEP 5: Calculate Hybrid Score
+  // ====================================================
+
+    // ====================================================
   // STEP 5: Calculate Hybrid Score
   // ====================================================
 
@@ -230,16 +278,25 @@ const searchCandidatesHybrid = async ({
             candidate.keyword_score
           ) || 0;
 
-        /*
-         * Semantic search is intentionally dominant.
-         *
-         * Semantic = 70%
-         * Keyword  = 30%
-         */
+        const candidateDetails =
+          candidateDetailsMap.get(
+            candidate.candidate_id
+          );
+/*
+ * Hybrid scoring
+ *
+ * Semantic = 60%
+ * Keyword  = 40%
+ *
+ * Keyword matches receive stronger weight so that
+ * explicit recruiter requirements such as AWS, Java,
+ * Python, etc. are not outranked by loosely related
+ * semantic matches.
+ */
 
-        const hybridScore =
-          (semanticScore * 0.70) +
-          (keywordScore * 0.30);
+const hybridScore =
+  (semanticScore * 0.70) +
+  (keywordScore * 0.30);
 
         return {
 
@@ -247,9 +304,11 @@ const searchCandidatesHybrid = async ({
             candidate.candidate_id,
 
           full_name:
+            candidateDetails?.full_name ||
             candidate.full_name,
 
           email:
+            candidateDetails?.email ||
             candidate.email,
 
           semantic_score:
@@ -268,13 +327,12 @@ const searchCandidatesHybrid = async ({
             ),
 
           candidate:
-            candidate.keyword_candidate,
+            candidateDetails || null,
 
           embedding_content:
             candidate.content,
         };
       });
-
   // ====================================================
   // STEP 6: Sort by Hybrid Score
   // ====================================================

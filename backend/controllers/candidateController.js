@@ -1,14 +1,31 @@
 const {
   getAllCandidates,
-  searchCandidates,
   getCandidateById,
 } = require("../services/candidateSearchService");
-const { updateCandidate } = require("../services/candidateUpdateService");
-const { deleteCandidate } = require("../services/candidateDeleteService");
+
+const {
+  searchCandidatesHybrid,
+} = require("../services/candidateHybridSearchService");
+
+const {
+  updateCandidate,
+} = require("../services/candidateUpdateService");
+
+const {
+  deleteCandidate,
+} = require("../services/candidateDeleteService");
+
+
 console.log({
   getAllCandidates,
-  searchCandidates,
+  searchCandidatesHybrid,
 });
+
+
+// ======================================================
+// Candidate Search
+// ======================================================
+
 const searchCandidate = async (req, res) => {
   try {
     console.log("🔎 searchCandidate controller HIT");
@@ -20,18 +37,22 @@ const searchCandidate = async (req, res) => {
       experience,
     } = req.query;
 
-    const candidates = await searchCandidates({
-      keyword,
+    const candidates = await searchCandidatesHybrid({
+      query: keyword,
       location,
       experience,
     });
 
     console.log(
-      "✅ searchCandidates returned:",
+      "✅ searchCandidatesHybrid returned:",
       candidates
     );
 
-    res.json(candidates);
+    res.status(200).json({
+      success: true,
+      count: candidates.length,
+      data: candidates,
+    });
 
   } catch (error) {
     console.error("❌ Candidate search error:");
@@ -44,6 +65,12 @@ const searchCandidate = async (req, res) => {
     });
   }
 };
+
+
+// ======================================================
+// Candidate Listing
+// ======================================================
+
 const getCandidates = async (req, res) => {
   try {
     const candidates = await getAllCandidates();
@@ -53,6 +80,7 @@ const getCandidates = async (req, res) => {
       count: candidates.length,
       data: candidates,
     });
+
   } catch (error) {
     console.error(error);
 
@@ -62,6 +90,12 @@ const getCandidates = async (req, res) => {
     });
   }
 };
+
+
+// ======================================================
+// Candidate Details
+// ======================================================
+
 const getCandidateDetails = async (req, res) => {
   try {
     const { id } = req.params;
@@ -72,6 +106,7 @@ const getCandidateDetails = async (req, res) => {
       success: true,
       data: candidate,
     });
+
   } catch (error) {
     console.error(error);
 
@@ -82,17 +117,26 @@ const getCandidateDetails = async (req, res) => {
   }
 };
 
+
+// ======================================================
+// Update Candidate
+// ======================================================
+
 const updateCandidateController = async (req, res) => {
   try {
     console.log("Request Body:", req.body);
 
-    const candidate = await updateCandidate(req.params.id, req.body);
+    const candidate = await updateCandidate(
+      req.params.id,
+      req.body
+    );
 
     res.status(200).json({
       success: true,
       message: "Candidate updated successfully",
       data: candidate,
     });
+
   } catch (error) {
     console.error(error);
 
@@ -102,6 +146,12 @@ const updateCandidateController = async (req, res) => {
     });
   }
 };
+
+
+// ======================================================
+// Delete Candidate
+// ======================================================
+
 const deleteCandidateController = async (req, res) => {
   try {
     const { id } = req.params;
@@ -113,6 +163,7 @@ const deleteCandidateController = async (req, res) => {
       message: "Candidate deleted successfully",
       data: candidate,
     });
+
   } catch (error) {
     console.error(error);
 
@@ -122,6 +173,12 @@ const deleteCandidateController = async (req, res) => {
     });
   }
 };
+
+
+// ======================================================
+// Exports
+// ======================================================
+
 module.exports = {
   getCandidates,
   searchCandidate,

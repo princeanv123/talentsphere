@@ -1,6 +1,45 @@
 const supabase = require("../config/supabase");
 
 // ========================================
+// Keyword Extraction
+// ========================================
+
+const extractKeywordTerms = (keyword) => {
+  const stopWords = new Set([
+    "with",
+    "and",
+    "the",
+    "for",
+    "from",
+    "in",
+    "of",
+    "to",
+    "a",
+    "an",
+    "on",
+    "at",
+    "by",
+    "is",
+    "are",
+    "experience",
+  ]);
+
+  return keyword
+    .trim()
+    .split(/\s+/)
+    .map((term) =>
+      term
+        .replace(/[.,!?;:()]/g, "")
+        .trim()
+    )
+    .filter(
+      (term) =>
+        term.length >= 3 &&
+        !stopWords.has(term.toLowerCase())
+    );
+};
+
+// ========================================
 // Candidate Listing
 // ========================================
 
@@ -8,7 +47,9 @@ const getAllCandidates = async () => {
   const { data, error } = await supabase
     .from("candidates")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", {
+      ascending: false,
+    });
 
   if (error) {
     throw new Error(error.message);
@@ -45,7 +86,9 @@ const searchCandidates = async ({
       searchTerm.startsWith('"') &&
       searchTerm.endsWith('"')
     ) {
-      searchTerm = searchTerm.slice(1, -1).trim();
+      searchTerm = searchTerm
+        .slice(1, -1)
+        .trim();
     }
 
     // --------------------------------------
@@ -56,16 +99,33 @@ const searchCandidates = async ({
       searchTerm.startsWith("'") &&
       searchTerm.endsWith("'")
     ) {
-      searchTerm = searchTerm.slice(1, -1).trim();
+      searchTerm = searchTerm
+        .slice(1, -1)
+        .trim();
     }
 
-    // If nothing remains after cleaning
+    // --------------------------------------
+    // If nothing remains
+    // --------------------------------------
+
     if (!searchTerm) {
       return [];
     }
 
     console.log("======================================");
-    console.log("Candidate Keyword Search:", searchTerm);
+    console.log(
+      "Candidate Keyword Search:",
+      searchTerm
+    );
+
+    const searchTerms =
+      extractKeywordTerms(searchTerm);
+
+    console.log(
+      "Extracted keyword terms:",
+      searchTerms
+    );
+
     console.log("======================================");
 
     // ======================================
@@ -122,7 +182,9 @@ const searchCandidates = async ({
       );
 
     if (locationError) {
-      throw new Error(locationError.message);
+      throw new Error(
+        locationError.message
+      );
     }
 
     // ======================================
@@ -141,7 +203,9 @@ const searchCandidates = async ({
       );
 
     if (summaryError) {
-      throw new Error(summaryError.message);
+      throw new Error(
+        summaryError.message
+      );
     }
 
     // ======================================
@@ -190,52 +254,99 @@ const searchCandidates = async ({
     // 7. Skills
     // ======================================
 
-    const {
-      data: skillMatches,
-      error: skillError,
-    } = await supabase
-      .from("skills")
-      .select("id")
-      .ilike(
-        "skill_name",
-        `%${searchTerm}%`
-      );
-
-    if (skillError) {
-      throw new Error(skillError.message);
-    }
-
-    // ======================================
-    // Candidates Having Matching Skills
-    // ======================================
-
     let skillCandidateMatches = [];
 
-    if (
-      skillMatches &&
-      skillMatches.length > 0
-    ) {
-      const skillIds = skillMatches.map(
-        (skill) => skill.id
+    for (const term of searchTerms) {
+      console.log(
+        "Testing skill term:",
+        term
       );
 
       const {
-        data: candidateSkillMatches,
-        error: candidateSkillError,
+        data: skillMatches,
+        error: skillError,
       } = await supabase
-        .from("candidate_skills")
-        .select("candidate_id")
-        .in("skill_id", skillIds);
+        .from("skills")
+        .select("id, skill_name")
+        .ilike(
+          "skill_name",
+          `%${term}%`
+        );
 
-      if (candidateSkillError) {
+      if (skillError) {
         throw new Error(
-          candidateSkillError.message
+          skillError.message
         );
       }
 
-      skillCandidateMatches =
-        candidateSkillMatches || [];
+      console.log(
+        "Matching skills for",
+        term,
+        ":",
+        skillMatches
+      );
+
+      if (
+        skillMatches &&
+        skillMatches.length > 0
+      ) {
+        const skillIds =
+          skillMatches.map(
+            (skill) => skill.id
+          );
+
+        const {
+          data: candidateSkillMatches,
+          error: candidateSkillError,
+        } = await supabase
+          .from("candidate_skills")
+          .select(
+            "candidate_id, skill_id"
+          )
+          .in(
+            "skill_id",
+            skillIds
+          );
+
+        if (candidateSkillError) {
+          throw new Error(
+            candidateSkillError.message
+          );
+        }
+
+        console.log(
+          "Candidate IDs for",
+          term,
+          ":",
+          candidateSkillMatches
+        );
+
+        skillCandidateMatches.push(
+          ...(candidateSkillMatches || [])
+        );
+      }
     }
+
+    // --------------------------------------
+    // Remove duplicate candidate/skill
+    // relationships
+    // --------------------------------------
+
+    skillCandidateMatches = [
+      ...new Map(
+        skillCandidateMatches.map(
+          (item) => [
+            `${item.candidate_id}-${item.skill_id}`,
+            item,
+          ]
+        )
+      ).values(),
+    ];
+
+    console.log(
+      "Final skill candidate matches:",
+      skillCandidateMatches
+    );
 
     // ======================================
     // 8. Historical Company Name
@@ -453,7 +564,10 @@ const searchCandidates = async ({
 
     const candidateIds = [
 
+      // ------------------------------------
       // Candidate
+      // ------------------------------------
+
       ...(nameMatches || []).map(
         (candidate) => candidate.id
       ),
@@ -470,7 +584,10 @@ const searchCandidates = async ({
         (candidate) => candidate.id
       ),
 
-      // Current employment
+      // ------------------------------------
+      // Current Employment
+      // ------------------------------------
+
       ...(currentCompanyMatches || []).map(
         (candidate) => candidate.id
       ),
@@ -479,13 +596,19 @@ const searchCandidates = async ({
         (candidate) => candidate.id
       ),
 
+      // ------------------------------------
       // Skills
+      // ------------------------------------
+
       ...skillCandidateMatches.map(
         (candidate) =>
           candidate.candidate_id
       ),
 
-      // Historical employment
+      // ------------------------------------
+      // Historical Employment
+      // ------------------------------------
+
       ...(experienceCompanyMatches || []).map(
         (candidate) =>
           candidate.candidate_id
@@ -511,7 +634,10 @@ const searchCandidates = async ({
           candidate.candidate_id
       ),
 
+      // ------------------------------------
       // Education
+      // ------------------------------------
+
       ...(educationDegreeMatches || []).map(
         (candidate) =>
           candidate.candidate_id
@@ -527,7 +653,10 @@ const searchCandidates = async ({
           candidate.candidate_id
       ),
 
+      // ------------------------------------
       // Certifications
+      // ------------------------------------
+
       ...(certificationMatches || []).map(
         (candidate) =>
           candidate.candidate_id
@@ -824,9 +953,8 @@ const updateCandidate = async (
 
   if (data.experience !== undefined) {
 
-    const experience = Number(
-      data.experience
-    );
+    const experience =
+      Number(data.experience);
 
     if (isNaN(experience)) {
       throw new Error(
