@@ -21,7 +21,17 @@ const searchCandidatesByEmbedding = async (
     match_limit: limit,
   }
 );
+console.log(
+  "SEMANTIC CANDIDATE SCORE LIST"
+);
 
+console.table(
+  (data || []).map((candidate) => ({
+    name: candidate.full_name,
+    similarity:
+      Number(candidate.similarity?.toFixed(4))
+  }))
+);
 console.log("========== SEMANTIC SEARCH RPC ==========");
 console.log("RPC error:", error);
 console.log("RPC data:", data);

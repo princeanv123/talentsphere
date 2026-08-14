@@ -54,13 +54,39 @@ const searchCandidatesHybrid = async ({
       keyword: searchQuery,
       location,
       experience,
+      includeKeywordMetadata: true,
     });
 
   console.log(
     "Keyword candidates:",
     keywordCandidates?.length || 0
   );
+  console.log(
+  "KEYWORD METADATA SAMPLE:"
+);
 
+console.log(
+  JSON.stringify(
+    (keywordCandidates || []).slice(0, 20).map(
+      (candidate) => ({
+        id: candidate.id,
+        full_name: candidate.full_name,
+        keyword_metadata:
+          candidate.keyword_metadata,
+      })
+    ),
+    null,
+    2
+  )
+);
+console.log(
+  "Keyword metadata sample:",
+  JSON.stringify(
+    keywordCandidates?.slice(0, 5),
+    null,
+    2
+  )
+);
   // ====================================================
   // STEP 2: Generate Query Embedding
   // ====================================================
@@ -113,6 +139,8 @@ const searchCandidatesHybrid = async ({
     "STEP 4: Combining keyword + semantic results..."
   );
 
+  
+
   const candidateMap = new Map();
 
   // ----------------------------------------------------
@@ -152,62 +180,147 @@ const searchCandidatesHybrid = async ({
   // Add keyword candidates
   // ----------------------------------------------------
 
-  for (
-    const candidate of keywordCandidates || []
-  ) {
+for (
+  const candidate of keywordCandidates || []
+) {
 
-    const candidateId =
-      candidate.id;
+  const candidateId =
+    candidate.id;
 
-    if (!candidateId) {
-      continue;
-    }
-
-    // Candidate already found by semantic search
-    if (candidateMap.has(candidateId)) {
-
-      const existing =
-        candidateMap.get(candidateId);
-
-      existing.keyword_score = 1;
-
-      existing.keyword_candidate =
-        candidate;
-
-      candidateMap.set(
-        candidateId,
-        existing
-      );
-
-    }
-
-    // Candidate found ONLY by keyword search
-    else {
-
-      candidateMap.set(
-        candidateId,
-        {
-          candidate_id:
-            candidateId,
-
-          full_name:
-            candidate.full_name,
-
-          email:
-            candidate.email,
-
-          content: null,
-
-          semantic_score: 0,
-
-          keyword_score: 1,
-
-          keyword_candidate:
-            candidate,
-        }
-      );
-    }
+  if (!candidateId) {
+    continue;
   }
+
+  // ==================================================
+  // Calculate normalized keyword score
+  // ==================================================
+
+  const keywordMetadata =
+    candidate.keyword_metadata;
+
+  const keywordScore =
+    keywordMetadata &&
+    keywordMetadata.total_terms > 0
+      ? keywordMetadata.matched_term_count /
+        keywordMetadata.total_terms
+      : 0;
+
+  console.log(
+    "Keyword score:",
+    candidate.full_name,
+    keywordScore
+  );
+
+  // ==================================================
+  // Candidate already found by semantic search
+  // ==================================================
+
+  if (candidateMap.has(candidateId)) {
+
+    const existing =
+      candidateMap.get(candidateId);
+
+    existing.keyword_score =
+      keywordScore;
+
+    existing.keyword_candidate =
+      candidate;
+
+    candidateMap.set(
+      candidateId,
+      existing
+    );
+  }
+
+  // ==================================================
+  // Candidate found ONLY by keyword search
+  // ==================================================
+
+  else {
+
+    candidateMap.set(
+      candidateId,
+      {
+        candidate_id:
+          candidateId,
+
+        full_name:
+          candidate.full_name,
+
+        email:
+          candidate.email,
+
+        content: null,
+
+        semantic_score: 0,
+
+        keyword_score:
+          keywordScore,
+
+        keyword_candidate:
+          candidate,
+      }
+    );
+  }
+}
+
+  // ====================================================
+  // TEMPORARY HYBRID DEBUG
+  // ====================================================
+
+  console.log(
+    "========== HYBRID DEBUG =========="
+  );
+
+  console.log(
+    "Semantic candidates:",
+    (semanticCandidates || []).map(
+      (candidate) => ({
+        id: candidate.candidate_id,
+        name: candidate.full_name,
+        similarity: candidate.similarity
+      })
+    )
+  );
+
+  console.log(
+    "Keyword candidates:",
+    (keywordCandidates || []).map(
+      (candidate) => ({
+        id: candidate.id,
+        name: candidate.full_name,
+        matched_terms:
+          candidate.keyword_metadata?.matched_terms,
+        matched_count:
+          candidate.keyword_metadata?.matched_term_count,
+        total_terms:
+          candidate.keyword_metadata?.total_terms
+      })
+    )
+  );
+
+  console.log(
+    "Candidate Map:",
+    Array.from(candidateMap.values()).map(
+      (candidate) => ({
+        id: candidate.candidate_id,
+        name: candidate.full_name,
+        semantic_score:
+          candidate.semantic_score,
+        keyword_score:
+          candidate.keyword_score
+      })
+    )
+  );
+
+  console.log(
+    "Candidate Map Size:",
+    candidateMap.size
+  );
+
+  console.log(
+    "=================================="
+  );
   // ====================================================
   // STEP 4.5: Enrich Candidates
   // ====================================================
@@ -285,8 +398,8 @@ const searchCandidatesHybrid = async ({
 /*
  * Hybrid scoring
  *
- * Semantic = 60%
- * Keyword  = 40%
+ * Semantic = 70%
+ * Keyword  = 30%
  *
  * Keyword matches receive stronger weight so that
  * explicit recruiter requirements such as AWS, Java,
@@ -346,7 +459,18 @@ const hybridScore =
       b.hybrid_score -
       a.hybrid_score
   );
+console.log(
+  "HYBRID SCORE COMPARISON"
+);
 
+console.table(
+  results.map((candidate) => ({
+    name: candidate.full_name,
+    semantic: candidate.semantic_score,
+    keyword: candidate.keyword_score,
+    hybrid: candidate.hybrid_score,
+  }))
+);
   // ====================================================
   // STEP 7: Return Top Candidates
   // ====================================================

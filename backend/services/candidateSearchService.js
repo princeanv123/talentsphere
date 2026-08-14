@@ -62,14 +62,24 @@ const getAllCandidates = async () => {
 // Candidate Search
 // ========================================
 
-const searchCandidates = async ({
-  keyword,
-  location,
-  experience,
-}) => {
-  let query = supabase
-    .from("candidates")
+const searchCandidates = async ({ 
+  keyword, 
+  location, 
+  experience, 
+  includeKeywordMetadata = false, 
+}) => { 
+
+  let query = supabase 
+    .from("candidates") 
     .select("*");
+
+  // ========================================
+  // Keyword Metadata
+  // ========================================
+
+  let searchTerms = [];
+
+  const keywordMatchMap = new Map();
 
   // ========================================
   // KEYWORD SEARCH
@@ -118,9 +128,18 @@ const searchCandidates = async ({
       searchTerm
     );
 
-    const searchTerms =
+    searchTerms =
       extractKeywordTerms(searchTerm);
+          // ======================================
+    // Keyword Match Metadata
+    // ======================================
 
+        for (const term of searchTerms) {
+      keywordMatchMap.set(
+        term.toLowerCase(),
+        new Set()
+      );
+    }   
     console.log(
       "Extracted keyword terms:",
       searchTerms
@@ -322,8 +341,27 @@ const searchCandidates = async ({
         );
 
         skillCandidateMatches.push(
-          ...(candidateSkillMatches || [])
-        );
+  ...(candidateSkillMatches || [])
+);
+
+// --------------------------------------
+// Record keyword metadata
+// --------------------------------------
+
+for (const match of candidateSkillMatches || []) {
+  const termKey = term.toLowerCase();
+
+  if (!keywordMatchMap.has(termKey)) {
+    keywordMatchMap.set(
+      termKey,
+      new Set()
+    );
+  }
+
+  keywordMatchMap
+    .get(termKey)
+    .add(match.candidate_id);
+}
       }
     }
 
@@ -744,7 +782,48 @@ const searchCandidates = async ({
     throw new Error(error.message);
   }
 
+  if (!includeKeywordMetadata) {
   return data;
+}
+const totalTerms =
+  searchTerms.length;
+
+const resultsWithMetadata =
+  (data || []).map((candidate) => {
+
+    const matchedTerms = [];
+
+    for (const term of searchTerms) {
+
+      const candidateIds =
+        keywordMatchMap.get(
+          term.toLowerCase()
+        );
+
+      if (
+        candidateIds &&
+        candidateIds.has(candidate.id)
+      ) {
+        matchedTerms.push(term);
+      }
+    }
+
+    return {
+      ...candidate,
+
+      keyword_metadata: {
+        matched_terms: matchedTerms,
+
+        matched_term_count:
+          matchedTerms.length,
+
+        total_terms:
+          totalTerms,
+      },
+    };
+  });
+
+return resultsWithMetadata;
 };
 
 // ========================================
