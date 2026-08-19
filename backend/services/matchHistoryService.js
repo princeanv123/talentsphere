@@ -1,14 +1,19 @@
 const supabase = require("../config/supabase");
 
+
+// ======================================================
+// Save Candidate Match Analysis
+// ======================================================
+
 const saveMatchHistory = async (
   candidateId,
   jobId,
   analysis
 ) => {
 
-  // ----------------------------------------------------
-  // Validate required data
-  // ----------------------------------------------------
+  // ====================================================
+  // Validate
+  // ====================================================
 
   if (!candidateId) {
     throw new Error("candidateId is required.");
@@ -23,9 +28,9 @@ const saveMatchHistory = async (
   }
 
 
-  // ----------------------------------------------------
-  // Map Gemini analysis to database structure
-  // ----------------------------------------------------
+  // ====================================================
+  // Prepare Database Record
+  // ====================================================
 
   const matchData = {
 
@@ -33,14 +38,11 @@ const saveMatchHistory = async (
 
     job_id: jobId,
 
-    // Gemini: overallMatch
     match_score:
       typeof analysis.overallMatch === "number"
         ? analysis.overallMatch
         : null,
 
-    // These will be populated later by our
-    // local skill-matching engine if available.
     matching_skills:
       Array.isArray(analysis.matchingSkills)
         ? analysis.matchingSkills
@@ -51,56 +53,49 @@ const saveMatchHistory = async (
         ? analysis.missingSkills
         : [],
 
-    // Gemini: strengths
     strengths:
       Array.isArray(analysis.strengths)
         ? analysis.strengths
         : [],
 
-    // Gemini: gaps
     weaknesses:
       Array.isArray(analysis.gaps)
         ? analysis.gaps
         : [],
 
-    // Gemini: recommendation
     recommendation:
       analysis.recommendation || null,
 
-    // Generate a readable summary
     summary:
-      analysis.summary ||
-      `Overall match: ${
-        typeof analysis.overallMatch === "number"
-          ? analysis.overallMatch
-          : "N/A"
-      }%. Recommendation: ${
-        analysis.recommendation || "N/A"
-      }`,
+      analysis.summary || null,
   };
 
 
-  // ----------------------------------------------------
-  // Save to candidate_matches
-  // ----------------------------------------------------
+  // ====================================================
+  // Insert Match History
+  // ====================================================
 
-  const { data, error } = await supabase
+  const {
+    data,
+    error,
+  } = await supabase
     .from("candidate_matches")
     .insert([matchData])
     .select()
     .single();
 
 
-  // ----------------------------------------------------
-  // Handle database error
-  // ----------------------------------------------------
+  // ====================================================
+  // Handle Error
+  // ====================================================
 
   if (error) {
 
     console.error(
-      "❌ Failed to save match history:",
-      error
+      "❌ Failed to save match history:"
     );
+
+    console.error(error);
 
     throw new Error(
       `Unable to save match history: ${error.message}`
@@ -108,18 +103,53 @@ const saveMatchHistory = async (
   }
 
 
-  // ----------------------------------------------------
+  // ====================================================
   // Success
-  // ----------------------------------------------------
+  // ====================================================
 
   console.log(
-    "✅ Match history saved:",
+    "======================================"
+  );
+
+  console.log(
+    "✅ MATCH HISTORY SAVED"
+  );
+
+  console.log(
+    "Match ID:",
     data.id
   );
+
+  console.log(
+    "Candidate ID:",
+    candidateId
+  );
+
+  console.log(
+    "Job ID:",
+    jobId
+  );
+
+  console.log(
+    "AI Match Score:",
+    data.match_score
+  );
+
+  console.log(
+    "Recommendation:",
+    data.recommendation
+  );
+
+  console.log(
+    "======================================"
+  );
+
 
   return data;
 };
 
+
+// ======================================================
 
 module.exports = {
   saveMatchHistory,

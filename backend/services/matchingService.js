@@ -1,62 +1,39 @@
 const { discoverCandidates } = require("./candidateDiscoveryService");
+
 const { saveMatchHistory } = require("./matchHistoryService");
+
 const supabase = require("../config/supabase");
 
 const {
   generateMatchAnalysis,
 } = require("./geminiService");
 
+const {
+  calculateFinalMatchScore,
+} = require("./candidateMatchScoreService");
+
 console.log(
-  "✅ matchingService.js LOADED - Local bulk matching enabled"
+  "✅ matchingService.js LOADED - Local bulk matching + deterministic scoring enabled"
 );
 
-// ======================================================
-// MATCHING CONFIGURATION
-// ======================================================
-
-const SKILL_WEIGHT = 70;
-const EXPERIENCE_WEIGHT = 30;
 
 // ======================================================
-// HELPER: Normalize Text
+// AI Candidate vs Job Matching
 // ======================================================
-
-const normalizeSkill = (skill) => {
-  if (!skill) return "";
-
-  return String(skill)
-    .trim()
-    .toLowerCase();
-};
-
-// ======================================================
-// HELPER: Convert Experience to Number
-// ======================================================
-
-const normalizeExperience = (value) => {
-  if (value === null || value === undefined) {
-    return 0;
-  }
-
-  const number = Number(value);
-
-  if (!Number.isNaN(number)) {
-    return number;
-  }
-
-  const match = String(value).match(/\d+(\.\d+)?/);
-
-  return match ? Number(match[0]) : 0;
-};
-
-// ======================================================
-// GET MATCHING SCORE FOR ONE CANDIDATE
 //
-// This endpoint DOES use Gemini.
-// It is intended for detailed individual analysis.
+// This endpoint is for an explicit individual match.
+//
+// Gemini:
+//     YES - exactly one AI analysis
+//
+// Bulk candidate discovery does NOT use this function.
+//
 // ======================================================
 
-const getMatchingScore = async ({ candidateId, jobId }) => {
+const getMatchingScore = async ({
+  candidateId,
+  jobId,
+}) => {
 
   // ----------------------------------------------------
   // Fetch Candidate
@@ -75,6 +52,7 @@ const getMatchingScore = async ({ candidateId, jobId }) => {
     throw new Error("Candidate not found.");
   }
 
+
   // ----------------------------------------------------
   // Fetch Job
   // ----------------------------------------------------
@@ -92,35 +70,77 @@ const getMatchingScore = async ({ candidateId, jobId }) => {
     throw new Error("Job not found.");
   }
 
+
   // ----------------------------------------------------
-  // Generate AI Analysis
+  // Generate ONE AI Analysis
   // ----------------------------------------------------
 
-  const analysis = await generateMatchAnalysis(
-    candidate,
-    job
+  console.log(
+    "======================================"
   );
+
+  console.log(
+    "INDIVIDUAL MATCH ANALYSIS"
+  );
+
+  console.log(
+    "Candidate:",
+    candidate.full_name
+  );
+
+  console.log(
+    "Job:",
+    job.title
+  );
+
+  console.log(
+    "Gemini Requests: 1"
+  );
+
+  console.log(
+    "======================================"
+  );
+
+
+  const analysis =
+    await generateMatchAnalysis(
+      candidate,
+      job
+    );
+
 
   // ----------------------------------------------------
   // Save Match History
   // ----------------------------------------------------
 
-  const matchHistory = await saveMatchHistory(
-    candidateId,
-    jobId,
-    analysis
-  );
+  const matchHistory =
+    await saveMatchHistory(
+      candidateId,
+      jobId,
+      analysis
+    );
+
+
+  // ----------------------------------------------------
+  // Return
+  // ----------------------------------------------------
 
   return {
+
     candidate,
+
     job,
+
     analysis,
+
     matchHistory,
+
   };
 };
 
+
 // ======================================================
-// GET JOB SKILLS
+// Fetch Job Skills
 // ======================================================
 
 const getJobSkills = async (jobId) => {
@@ -138,204 +158,92 @@ const getJobSkills = async (jobId) => {
     `)
     .eq("job_id", jobId);
 
+
   if (error) {
     throw new Error(
-      `Failed to fetch job skills: ${error.message}`
+      error.message
     );
   }
 
+
   return (data || [])
-    .filter((item) => item.skills)
-    .map((item) => item.skills.skill_name)
+    .filter(item => item.skills)
+    .map(
+      item => item.skills.skill_name
+    )
     .filter(Boolean);
 };
 
-// ======================================================
-// GET CANDIDATE SKILLS
-// ======================================================
-
-const getCandidateSkills = async (candidateId) => {
-
-  const {
-    data,
-    error,
-  } = await supabase
-    .from("candidate_skills")
-    .select(`
-      skill_id,
-      skills (
-        skill_name
-      )
-    `)
-    .eq("candidate_id", candidateId);
-
-  if (error) {
-    throw new Error(
-      `Failed to fetch candidate skills: ${error.message}`
-    );
-  }
-
-  return (data || [])
-    .filter((item) => item.skills)
-    .map((item) => item.skills.skill_name)
-    .filter(Boolean);
-};
 
 // ======================================================
-// GET ALL CANDIDATE SKILLS
-//
-// IMPORTANT:
-// Instead of making one DB query per candidate,
-// we fetch all candidate skills in ONE query.
+// Fetch Candidate Skills
 // ======================================================
 
-const getAllCandidateSkills = async (candidateIds = []) => {
-
-  if (!candidateIds.length) {
-    return {};
-  }
-
-  const {
-    data,
-    error,
-  } = await supabase
-    .from("candidate_skills")
-    .select(`
-      candidate_id,
-      skill_id,
-      skills (
-        skill_name
-      )
-    `)
-    .in("candidate_id", candidateIds);
-
-  if (error) {
-    throw new Error(
-      `Failed to fetch candidate skills: ${error.message}`
-    );
-  }
-
-  const skillsByCandidate = {};
-
-  // Initialize every candidate
-  for (const candidateId of candidateIds) {
-    skillsByCandidate[candidateId] = [];
-  }
-
-  // Group skills by candidate
-  for (const row of data || []) {
-
-    if (
-      !row.candidate_id ||
-      !row.skills ||
-      !row.skills.skill_name
-    ) {
-      continue;
-    }
-
-    if (!skillsByCandidate[row.candidate_id]) {
-      skillsByCandidate[row.candidate_id] = [];
-    }
-
-    skillsByCandidate[row.candidate_id].push(
-      row.skills.skill_name
-    );
-  }
-
-  return skillsByCandidate;
-};
-
-// ======================================================
-// CALCULATE EXPERIENCE MATCH
-//
-// Returns a percentage between 0 and 100.
-// ======================================================
-
-const calculateExperienceMatch = (
-  candidateExperience,
-  job
+const getCandidateSkills = async (
+  candidateId
 ) => {
 
-  const candidateYears =
-    normalizeExperience(candidateExperience);
-
-  // Support multiple possible job column names.
-  const requiredYears =
-    normalizeExperience(
-      job?.required_experience ??
-      job?.experience_required ??
-      job?.min_experience ??
-      job?.minimum_experience ??
-      0
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("candidate_skills")
+    .select(`
+      skill_id,
+      skills (
+        skill_name
+      )
+    `)
+    .eq(
+      "candidate_id",
+      candidateId
     );
 
-  // If job does not specify experience,
-  // don't penalize candidate.
-  if (requiredYears <= 0) {
-    return {
-      candidateExperience: candidateYears,
-      requiredExperience: 0,
-      experienceMatchPercentage: 100,
-    };
+
+  if (error) {
+    throw new Error(
+      error.message
+    );
   }
 
-  // Candidate meets or exceeds requirement.
-  if (candidateYears >= requiredYears) {
-    return {
-      candidateExperience: candidateYears,
-      requiredExperience: requiredYears,
-      experienceMatchPercentage: 100,
-    };
-  }
 
-  // Partial experience match.
-  const percentage = Math.round(
-    (candidateYears / requiredYears) * 100
-  );
-
-  return {
-    candidateExperience: candidateYears,
-    requiredExperience: requiredYears,
-    experienceMatchPercentage: Math.min(
-      percentage,
-      100
-    ),
-  };
+  return (data || [])
+    .filter(item => item.skills)
+    .map(
+      item => item.skills.skill_name
+    )
+    .filter(Boolean);
 };
 
-// ======================================================
-// CALCULATE FINAL SCORE
-// ======================================================
-
-const calculateFinalScore = ({
-  skillMatchPercentage,
-  experienceMatchPercentage,
-}) => {
-
-  const skillScore =
-    skillMatchPercentage * (SKILL_WEIGHT / 100);
-
-  const experienceScore =
-    experienceMatchPercentage *
-    (EXPERIENCE_WEIGHT / 100);
-
-  return Math.round(
-    skillScore + experienceScore
-  );
-};
 
 // ======================================================
-// DISCOVER CANDIDATES FOR JOB
+// Discover Candidates for Job
+// ======================================================
 //
 // IMPORTANT:
-// NO GEMINI CALL HERE.
 //
-// This is the bulk matching engine.
+// This is the BULK matching endpoint.
+//
+// Gemini is NEVER called here.
+//
+// Example:
+//
+// 100 candidates
+//      ↓
+// local calculations
+//      ↓
+// 100 candidates
+//      ↓
+// Gemini = 0
+//
 // ======================================================
 
-const getCandidatesForJob = async (jobId) => {
+const getCandidatesForJob = async (
+  jobId
+) => {
 
   // ----------------------------------------------------
+  // STEP 1
   // Fetch Job
   // ----------------------------------------------------
 
@@ -348,59 +256,74 @@ const getCandidatesForJob = async (jobId) => {
     .eq("id", jobId)
     .single();
 
+
   if (jobError || !job) {
-    throw new Error("Job not found.");
+    throw new Error(
+      "Job not found."
+    );
   }
 
+
   // ----------------------------------------------------
+  // STEP 2
   // Fetch Job Skills
   // ----------------------------------------------------
 
   const jobSkills =
-    await getJobSkills(jobId);
+    await getJobSkills(
+      jobId
+    );
+
+
+  // ----------------------------------------------------
+  // STEP 3
+  // Discover Candidates
+  // ----------------------------------------------------
+
+  const candidates =
+    await discoverCandidates(
+      job
+    );
+
+
+  console.log(
+    "======================================"
+  );
+
+  console.log(
+    "LOCAL CANDIDATE DISCOVERY"
+  );
+
+  console.log(
+    "Job:",
+    job.title
+  );
+
+  console.log(
+    "Candidates Discovered:",
+    candidates.length
+  );
+
+  console.log(
+    "Gemini Requests: 0"
+  );
+
+  console.log(
+    "======================================"
+  );
+
 
   // ----------------------------------------------------
   // Normalize Job Skills
   // ----------------------------------------------------
 
-  const normalizedJobSkills = [
-    ...new Set(
-      jobSkills
-        .map(normalizeSkill)
-        .filter(Boolean)
-    ),
-  ];
-
-  // ----------------------------------------------------
-  // Discover Candidates
-  // ----------------------------------------------------
-
-  const candidates =
-    await discoverCandidates(job);
-
-  console.log(
-    `Candidates Discovered: ${candidates.length}`
-  );
-
-  // ----------------------------------------------------
-  // Get Candidate IDs
-  // ----------------------------------------------------
-
-  const candidateIds =
-    candidates.map(
-      (candidate) => candidate.id
+  const normalizedJobSkills =
+    jobSkills.map(skill =>
+      skill
+        .trim()
+        .toLowerCase()
     );
 
-  // ----------------------------------------------------
-  // Fetch ALL Candidate Skills
-  //
-  // ONE DATABASE QUERY
-  // ----------------------------------------------------
-
-  const skillsByCandidate =
-    await getAllCandidateSkills(
-      candidateIds
-    );
 
   // ----------------------------------------------------
   // Process Candidates
@@ -408,92 +331,111 @@ const getCandidatesForJob = async (jobId) => {
 
   const candidatesWithSkills = [];
 
-  for (const candidate of candidates) {
+
+  for (
+    const candidate
+    of candidates
+  ) {
+
+    // --------------------------------------------------
+    // Fetch Candidate Skills
+    // --------------------------------------------------
 
     const candidateSkills =
-      skillsByCandidate[candidate.id] || [];
+      await getCandidateSkills(
+        candidate.id
+      );
+
 
     // --------------------------------------------------
     // Normalize Candidate Skills
     // --------------------------------------------------
 
-    const normalizedCandidateSkills = [
-      ...new Set(
-        candidateSkills
-          .map(normalizeSkill)
-          .filter(Boolean)
-      ),
-    ];
+    const normalizedCandidateSkills =
+      candidateSkills.map(skill =>
+        skill
+          .trim()
+          .toLowerCase()
+      );
+
 
     // --------------------------------------------------
-    // Find Matching Skills
+    // Matching Skills
     // --------------------------------------------------
 
     const matchingSkills =
       candidateSkills.filter(
-        (skill) =>
+        skill =>
           normalizedJobSkills.includes(
-            normalizeSkill(skill)
+            skill
+              .trim()
+              .toLowerCase()
           )
       );
 
-    // --------------------------------------------------
-    // Remove Duplicate Matching Skills
-    // --------------------------------------------------
-
-    const uniqueMatchingSkills = [
-      ...new Set(
-        matchingSkills.map(
-          (skill) => skill.trim()
-        )
-      ),
-    ];
 
     // --------------------------------------------------
-    // Find Missing Skills
+    // Missing Skills
     // --------------------------------------------------
 
     const missingSkills =
       jobSkills.filter(
-        (skill) =>
+        skill =>
           !normalizedCandidateSkills.includes(
-            normalizeSkill(skill)
+            skill
+              .trim()
+              .toLowerCase()
           )
       );
+
 
     // --------------------------------------------------
     // Skill Match Percentage
     // --------------------------------------------------
 
     const skillMatchPercentage =
-      normalizedJobSkills.length === 0
+      jobSkills.length === 0
         ? 0
         : Math.round(
-            (uniqueMatchingSkills.length /
-              normalizedJobSkills.length) *
-              100
+            (
+              matchingSkills.length /
+              jobSkills.length
+            ) * 100
           );
 
-    // --------------------------------------------------
-    // Experience Match
-    // --------------------------------------------------
 
-    const experienceMatch =
-      calculateExperienceMatch(
-        candidate.experience,
-        job
-      );
+    // ==================================================
+    // DETERMINISTIC MATCH SCORE
+    // ==================================================
+    //
+    // Gemini is intentionally NOT called.
+    //
+    // AI score = 0
+    //
+    // Current weights:
+    //
+    // Skills      40%
+    // Experience  20%
+    // Relevance   20%
+    // AI          20%
+    //
+    // ==================================================
 
-    // --------------------------------------------------
-    // Final Score
-    // --------------------------------------------------
+    const scoreBreakdown =
+      calculateFinalMatchScore({
 
-    const finalScore =
-      calculateFinalScore({
-        skillMatchPercentage,
-        experienceMatchPercentage:
-          experienceMatch.experienceMatchPercentage,
+        candidate,
+
+        job,
+
+        candidateSkills,
+
+        jobSkills,
+
+        aiRanking: null,
+
       });
+
 
     // --------------------------------------------------
     // Candidate Result
@@ -503,31 +445,45 @@ const getCandidatesForJob = async (jobId) => {
 
       ...candidate,
 
-      // Skills
-      skills: candidateSkills,
+      skills:
+        candidateSkills,
 
-      matchingSkills:
-        uniqueMatchingSkills,
+      matchingSkills,
 
       missingSkills,
 
-      // Skill matching
       skillMatchPercentage,
 
-      // Experience matching
-      candidateExperience:
-        experienceMatch.candidateExperience,
 
-      requiredExperience:
-        experienceMatch.requiredExperience,
+      // ----------------------------------------------
+      // NEW DETERMINISTIC SCORE
+      // ----------------------------------------------
 
-      experienceMatchPercentage:
-        experienceMatch.experienceMatchPercentage,
+      matchScore:
+        scoreBreakdown.finalScore,
 
-      // Final score
-      finalScore,
 
-      // AI
+      scoreBreakdown: {
+
+        skillScore:
+          scoreBreakdown.skillScore,
+
+        experienceScore:
+          scoreBreakdown.experienceScore,
+
+        relevanceScore:
+          scoreBreakdown.relevanceScore,
+
+        aiScore:
+          scoreBreakdown.aiScore,
+
+      },
+
+
+      // ----------------------------------------------
+      // AI Status
+      // ----------------------------------------------
+
       aiRanking: null,
 
       aiRankingStatus:
@@ -536,51 +492,44 @@ const getCandidatesForJob = async (jobId) => {
     });
   }
 
-  // ----------------------------------------------------
-  // Sort Candidates
+
+  // ==================================================
+  // SORT BY FINAL MATCH SCORE
+  // ==================================================
   //
-  // Highest final score first.
-  // ----------------------------------------------------
+  // Highest overall deterministic score first.
+  //
+  // If two candidates have the same score,
+  // skill match percentage becomes the tie-breaker.
+  //
+  // ==================================================
 
   candidatesWithSkills.sort(
     (a, b) => {
 
-      // First priority:
-      // Final score
       if (
-        b.finalScore !==
-        a.finalScore
+        b.matchScore !==
+        a.matchScore
       ) {
+
         return (
-          b.finalScore -
-          a.finalScore
+          b.matchScore -
+          a.matchScore
         );
       }
 
-      // Second priority:
-      // Skill match
-      if (
-        b.skillMatchPercentage !==
-        a.skillMatchPercentage
-      ) {
-        return (
-          b.skillMatchPercentage -
-          a.skillMatchPercentage
-        );
-      }
 
-      // Third priority:
-      // Experience
       return (
-        b.experienceMatchPercentage -
-        a.experienceMatchPercentage
+        b.skillMatchPercentage -
+        a.skillMatchPercentage
       );
     }
   );
 
-  // ----------------------------------------------------
-  // Log Matching Statistics
-  // ----------------------------------------------------
+
+  // ==================================================
+  // COMPLETION LOG
+  // ==================================================
 
   console.log(
     "=========================================="
@@ -591,11 +540,13 @@ const getCandidatesForJob = async (jobId) => {
   );
 
   console.log(
-    `Job: ${job.job_title || job.title || "Unknown"}`
+    "Job:",
+    job.title
   );
 
   console.log(
-    `Candidates: ${candidatesWithSkills.length}`
+    "Candidates:",
+    candidatesWithSkills.length
   );
 
   console.log(
@@ -603,16 +554,17 @@ const getCandidatesForJob = async (jobId) => {
   );
 
   console.log(
-    "Candidate Skill Queries: 1"
+    "Sorted By: Deterministic Match Score"
   );
 
   console.log(
     "=========================================="
   );
 
-  // ----------------------------------------------------
-  // Return Result
-  // ----------------------------------------------------
+
+  // ==================================================
+  // RETURN
+  // ==================================================
 
   return {
 
@@ -629,6 +581,7 @@ const getCandidatesForJob = async (jobId) => {
   };
 };
 
+
 // ======================================================
 // MODULE EXPORTS
 // ======================================================
@@ -641,12 +594,6 @@ module.exports = {
 
   getCandidateSkills,
 
-  getAllCandidateSkills,
-
   getCandidatesForJob,
-
-  calculateExperienceMatch,
-
-  calculateFinalScore,
 
 };
