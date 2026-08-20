@@ -1,4 +1,5 @@
 const supabase = require("../config/supabase");
+
 const {
   searchCandidates,
 } = require("./candidateSearchService");
@@ -11,7 +12,7 @@ const {
   generateEmbedding,
 } = require("./embeddingService");
 
-console.log("candidateHybridSearchService.js loaded");
+console.log("✅ candidateHybridSearchService.js loaded");
 
 // ======================================================
 // Hybrid Candidate Search
@@ -25,7 +26,7 @@ const searchCandidatesHybrid = async ({
 }) => {
 
   // ====================================================
-  // STEP 0: Validate input
+  // STEP 0: Validate Input
   // ====================================================
 
   if (!query || !query.trim()) {
@@ -44,49 +45,23 @@ const searchCandidatesHybrid = async ({
   console.log("======================================");
 
   // ====================================================
-  // STEP 1: Conventional Keyword Search
+  // STEP 1: Keyword Search
   // ====================================================
 
   console.log("STEP 1: Running keyword search...");
 
-  const keywordCandidates =
-    await searchCandidates({
-      keyword: searchQuery,
-      location,
-      experience,
-      includeKeywordMetadata: true,
-    });
+  const keywordCandidates = await searchCandidates({
+    keyword: searchQuery,
+    location,
+    experience,
+    includeKeywordMetadata: true,
+  });
 
   console.log(
     "Keyword candidates:",
     keywordCandidates?.length || 0
   );
-  console.log(
-  "KEYWORD METADATA SAMPLE:"
-);
 
-console.log(
-  JSON.stringify(
-    (keywordCandidates || []).slice(0, 20).map(
-      (candidate) => ({
-        id: candidate.id,
-        full_name: candidate.full_name,
-        keyword_metadata:
-          candidate.keyword_metadata,
-      })
-    ),
-    null,
-    2
-  )
-);
-console.log(
-  "Keyword metadata sample:",
-  JSON.stringify(
-    keywordCandidates?.slice(0, 5),
-    null,
-    2
-  )
-);
   // ====================================================
   // STEP 2: Generate Query Embedding
   // ====================================================
@@ -111,12 +86,6 @@ console.log(
     "STEP 3: Running semantic search..."
   );
 
-  /*
-   * We retrieve more semantic candidates than the final
-   * requested limit so that hybrid ranking has enough
-   * candidates to work with.
-   */
-
   const semanticLimit =
     Math.max(limit * 3, 20);
 
@@ -132,39 +101,38 @@ console.log(
   );
 
   // ====================================================
-  // STEP 4: Combine Both Search Results
+  // STEP 4: Combine Keyword + Semantic Results
   // ====================================================
 
   console.log(
     "STEP 4: Combining keyword + semantic results..."
   );
 
-  
-
   const candidateMap = new Map();
 
-  // ----------------------------------------------------
-  // Add semantic candidates
-  // ----------------------------------------------------
+  // ====================================================
+  // 4A. Add Semantic Candidates
+  // ====================================================
 
-  for (
-    const candidate of semanticCandidates || []
-  ) {
+  for (const candidate of semanticCandidates || []) {
+
+    if (!candidate?.candidate_id) {
+      continue;
+    }
 
     candidateMap.set(
       candidate.candidate_id,
       {
-        candidate_id:
-          candidate.candidate_id,
+        candidate_id: candidate.candidate_id,
 
         full_name:
-          candidate.full_name,
+          candidate.full_name || null,
 
         email:
-          candidate.email,
+          candidate.email || null,
 
         content:
-          candidate.content,
+          candidate.content || null,
 
         semantic_score:
           Number(candidate.similarity) || 0,
@@ -176,96 +144,97 @@ console.log(
     );
   }
 
-  // ----------------------------------------------------
-  // Add keyword candidates
-  // ----------------------------------------------------
+  // ====================================================
+  // 4B. Add Keyword Candidates
+  // ====================================================
 
-for (
-  const candidate of keywordCandidates || []
-) {
+  for (const candidate of keywordCandidates || []) {
 
-  const candidateId =
-    candidate.id;
+    const candidateId = candidate?.id;
 
-  if (!candidateId) {
-    continue;
-  }
+    if (!candidateId) {
+      continue;
+    }
 
-  // ==================================================
-  // Calculate normalized keyword score
-  // ==================================================
+    // --------------------------------------------------
+    // Calculate Keyword Score
+    // --------------------------------------------------
 
-  const keywordMetadata =
-    candidate.keyword_metadata;
+    const keywordMetadata =
+      candidate.keyword_metadata;
 
-  const keywordScore =
-    keywordMetadata &&
-    keywordMetadata.total_terms > 0
-      ? keywordMetadata.matched_term_count /
-        keywordMetadata.total_terms
-      : 0;
+    const keywordScore =
+      keywordMetadata &&
+      Number(keywordMetadata.total_terms) > 0
+        ? Number(
+            keywordMetadata.matched_term_count
+          ) /
+          Number(
+            keywordMetadata.total_terms
+          )
+        : 0;
 
-  console.log(
-    "Keyword score:",
-    candidate.full_name,
-    keywordScore
-  );
-
-  // ==================================================
-  // Candidate already found by semantic search
-  // ==================================================
-
-  if (candidateMap.has(candidateId)) {
-
-    const existing =
-      candidateMap.get(candidateId);
-
-    existing.keyword_score =
-      keywordScore;
-
-    existing.keyword_candidate =
-      candidate;
-
-    candidateMap.set(
-      candidateId,
-      existing
+    console.log(
+      "Keyword score:",
+      candidate.full_name,
+      keywordScore
     );
+
+    // --------------------------------------------------
+    // Candidate Already Exists From Semantic Search
+    // --------------------------------------------------
+
+    if (candidateMap.has(candidateId)) {
+
+      const existingCandidate =
+        candidateMap.get(candidateId);
+
+      existingCandidate.keyword_score =
+        keywordScore;
+
+      existingCandidate.keyword_candidate =
+        candidate;
+
+      candidateMap.set(
+        candidateId,
+        existingCandidate
+      );
+
+    }
+
+    // --------------------------------------------------
+    // Candidate Exists Only In Keyword Search
+    // --------------------------------------------------
+
+    else {
+
+      candidateMap.set(
+        candidateId,
+        {
+          candidate_id: candidateId,
+
+          full_name:
+            candidate.full_name || null,
+
+          email:
+            candidate.email || null,
+
+          content: null,
+
+          semantic_score: 0,
+
+          keyword_score:
+            keywordScore,
+
+          keyword_candidate:
+            candidate,
+        }
+      );
+    }
   }
-
-  // ==================================================
-  // Candidate found ONLY by keyword search
-  // ==================================================
-
-  else {
-
-    candidateMap.set(
-      candidateId,
-      {
-        candidate_id:
-          candidateId,
-
-        full_name:
-          candidate.full_name,
-
-        email:
-          candidate.email,
-
-        content: null,
-
-        semantic_score: 0,
-
-        keyword_score:
-          keywordScore,
-
-        keyword_candidate:
-          candidate,
-      }
-    );
-  }
-}
 
   // ====================================================
-  // TEMPORARY HYBRID DEBUG
+  // DEBUG - Combined Candidate Map
   // ====================================================
 
   console.log(
@@ -273,34 +242,11 @@ for (
   );
 
   console.log(
-    "Semantic candidates:",
-    (semanticCandidates || []).map(
-      (candidate) => ({
-        id: candidate.candidate_id,
-        name: candidate.full_name,
-        similarity: candidate.similarity
-      })
-    )
+    "Candidate Map Size:",
+    candidateMap.size
   );
 
-  console.log(
-    "Keyword candidates:",
-    (keywordCandidates || []).map(
-      (candidate) => ({
-        id: candidate.id,
-        name: candidate.full_name,
-        matched_terms:
-          candidate.keyword_metadata?.matched_terms,
-        matched_count:
-          candidate.keyword_metadata?.matched_term_count,
-        total_terms:
-          candidate.keyword_metadata?.total_terms
-      })
-    )
-  );
-
-  console.log(
-    "Candidate Map:",
+  console.table(
     Array.from(candidateMap.values()).map(
       (candidate) => ({
         id: candidate.candidate_id,
@@ -308,21 +254,17 @@ for (
         semantic_score:
           candidate.semantic_score,
         keyword_score:
-          candidate.keyword_score
+          candidate.keyword_score,
       })
     )
   );
 
   console.log(
-    "Candidate Map Size:",
-    candidateMap.size
-  );
-
-  console.log(
     "=================================="
   );
+
   // ====================================================
-  // STEP 4.5: Enrich Candidates
+  // STEP 4.5: Fetch Complete Candidate Records
   // ====================================================
 
   console.log(
@@ -365,11 +307,8 @@ for (
     "Candidate records fetched:",
     candidateDetailsMap.size
   );
-  // ====================================================
-  // STEP 5: Calculate Hybrid Score
-  // ====================================================
 
-    // ====================================================
+  // ====================================================
   // STEP 5: Calculate Hybrid Score
   // ====================================================
 
@@ -395,34 +334,63 @@ for (
           candidateDetailsMap.get(
             candidate.candidate_id
           );
-/*
- * Hybrid scoring
- *
- * Semantic = 70%
- * Keyword  = 30%
- *
- * Keyword matches receive stronger weight so that
- * explicit recruiter requirements such as AWS, Java,
- * Python, etc. are not outranked by loosely related
- * semantic matches.
- */
 
-const hybridScore =
-  (semanticScore * 0.70) +
-  (keywordScore * 0.30);
+        // ------------------------------------------------
+        // Hybrid Scoring
+        //
+        // Semantic = 70%
+        // Keyword  = 30%
+        // ------------------------------------------------
+
+        const hybridScore =
+          (semanticScore * 0.70) +
+          (keywordScore * 0.30);
+
+        // ------------------------------------------------
+        // IMPORTANT
+        //
+        // Spread candidateDetails into the TOP LEVEL.
+        //
+        // This allows the frontend to use:
+        //
+        // candidate.experience
+        // candidate.location
+        // candidate.full_name
+        // candidate.email
+        //
+        // instead of:
+        //
+        // candidate.candidate.experience
+        // ------------------------------------------------
 
         return {
+
+          ...(candidateDetails || {}),
+
+          // ------------------------------------------------
+          // Stable Candidate ID
+          // ------------------------------------------------
 
           candidate_id:
             candidate.candidate_id,
 
+          // ------------------------------------------------
+          // Ensure basic fields exist
+          // ------------------------------------------------
+
           full_name:
             candidateDetails?.full_name ||
-            candidate.full_name,
+            candidate.full_name ||
+            null,
 
           email:
             candidateDetails?.email ||
-            candidate.email,
+            candidate.email ||
+            null,
+
+          // ------------------------------------------------
+          // Search Scores
+          // ------------------------------------------------
 
           semantic_score:
             Number(
@@ -439,15 +407,25 @@ const hybridScore =
               hybridScore.toFixed(4)
             ),
 
-          candidate:
-            candidateDetails || null,
+          // ------------------------------------------------
+          // Keyword Metadata
+          // ------------------------------------------------
+
+          keyword_metadata:
+            candidate.keyword_candidate
+              ?.keyword_metadata || null,
+
+          // ------------------------------------------------
+          // Embedding Content
+          // ------------------------------------------------
 
           embedding_content:
-            candidate.content,
+            candidate.content || null,
         };
       });
+
   // ====================================================
-  // STEP 6: Sort by Hybrid Score
+  // STEP 6: Sort By Hybrid Score
   // ====================================================
 
   console.log(
@@ -459,18 +437,42 @@ const hybridScore =
       b.hybrid_score -
       a.hybrid_score
   );
-console.log(
-  "HYBRID SCORE COMPARISON"
-);
 
-console.table(
-  results.map((candidate) => ({
-    name: candidate.full_name,
-    semantic: candidate.semantic_score,
-    keyword: candidate.keyword_score,
-    hybrid: candidate.hybrid_score,
-  }))
-);
+  // ====================================================
+  // Hybrid Score Debug
+  // ====================================================
+
+  console.log(
+    "========== HYBRID SCORE COMPARISON =========="
+  );
+
+  console.table(
+    results.map((candidate) => ({
+      id:
+        candidate.id ||
+        candidate.candidate_id,
+
+      name:
+        candidate.full_name,
+
+      experience:
+        candidate.experience,
+
+      semantic:
+        candidate.semantic_score,
+
+      keyword:
+        candidate.keyword_score,
+
+      hybrid:
+        candidate.hybrid_score,
+    }))
+  );
+
+  console.log(
+    "=============================================="
+  );
+
   // ====================================================
   // STEP 7: Return Top Candidates
   // ====================================================

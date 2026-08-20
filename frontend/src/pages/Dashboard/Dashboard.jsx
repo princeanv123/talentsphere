@@ -1,191 +1,557 @@
-import { useState } from "react";
-import { Search } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import MainLayout from "../../components/layouts/MainLayout";
 import { searchCandidates } from "../../services/candidateService";
-import {
-  Users,
-  Briefcase,
-  BrainCircuit,
-  FileText,
-} from "lucide-react";
 
-import DashboardCard from "../../components/dashboard/DashboardCard";
+
 export default function Dashboard() {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+  // ========================================
+  // State
+  // ========================================
 
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
-    const handleSearch = async (e) => {
-    if (e.key !== "Enter") {
-      return;
-    }
 
-    if (!searchTerm.trim()) {
+  // ========================================
+  // Search Candidates
+  // ========================================
+
+  useEffect(() => {
+    const keyword = searchTerm.trim();
+
+    // Clear results when search box is empty
+    if (!keyword) {
       setSearchResults([]);
-      return;
-    }
-
-    try {
-      setSearchLoading(true);
       setSearchError("");
-
-      const results = await searchCandidates({
-        keyword: searchTerm,
-      });
-      console.log("Candidate Search Results:", results);
-      setSearchResults(results);
-      
-    } catch (error) {
-      console.error("Candidate search error:", error);
-      setSearchError(error.message);
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
+      setLoading(false);
+      return;
     }
+
+    const timer = setTimeout(async () => {
+      try {
+        setLoading(true);
+        setSearchError("");
+
+        const results = await searchCandidates({
+          keyword,
+        });
+
+        console.log("Candidate Search Results:", results);
+
+        /*
+          candidateService currently returns result.data.
+
+          However, we keep this defensive check so Dashboard
+          continues to work even if the service ever returns
+          the complete API response object.
+        */
+
+        const candidates = Array.isArray(results)
+          ? results
+          : Array.isArray(results?.data)
+            ? results.data
+            : [];
+
+        console.log("Candidates to render:", candidates);
+
+        setSearchResults(candidates);
+      } catch (error) {
+        console.error("Candidate search error:", error);
+
+        setSearchResults([]);
+        setSearchError(
+          error?.message || "Unable to search candidates"
+        );
+      } finally {
+        setLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // ========================================
+  // Helpers
+  // ========================================
+
+  const getCandidateName = (candidate) => {
+    return (
+      candidate?.full_name ||
+      candidate?.name ||
+      candidate?.candidate_name ||
+      "Unnamed Candidate"
+    );
   };
+
+  const getCandidateEmail = (candidate) => {
+    return candidate?.email || "Email not available";
+  };
+
+  const getCandidateLocation = (candidate) => {
+    return (
+      candidate?.location ||
+      candidate?.city ||
+      "Location not available"
+    );
+  };
+
+  function getCandidateExperience(candidate) {
+  if (
+    candidate?.experience !== null &&
+    candidate?.experience !== undefined &&
+    candidate?.experience !== ""
+  ) {
+    return candidate.experience;
+  }
+
+  return "N/A";
+    }
+
+  const getCandidateKey = (candidate, index) => {
+    /*
+      The backend data currently appears to have some records
+      where "id" is undefined.
+
+      Use the strongest available unique identifier first,
+      then email, then index as the final fallback.
+    */
+
+    return (
+      candidate?.id ||
+      candidate?.candidate_id ||
+      candidate?.uuid ||
+      candidate?.email ||
+      `candidate-${index}`
+    );
+  };
+
+  // ========================================
+  // Render
+  // ========================================
+
   return (
-    <MainLayout>
+    <div className="min-h-screen bg-white text-slate-800">
+      <div className="flex min-h-screen">
 
-<div className="flex flex-col items-center pt-2">
+        {/* ========================================
+            Sidebar
+        ======================================== */}
 
-  {/* Heading */}
+        <aside className="hidden w-[308px] shrink-0 border-r border-red-100 bg-white lg:block">
 
- <h1 className="text-5xl font-bold text-red-400 -mt-6">
-    TalentSphere Dashboard 
-</h1>
+          {/* Logo */}
 
-  {/* Tagline */}
+          <div className="px-6 pt-10 pb-12">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border-4 border-red-500 text-2xl font-bold text-red-500">
+                O
+              </div>
 
-  <p className="mt-3 text-xl text-gray-500">
-    Find the best candidates from your talent pool
-  </p>
+              <div>
+                <h1 className="text-4xl font-bold tracking-tight text-red-500">
+                  TalentSphere
+                </h1>
 
-  {/* Search */}
-<div className="mt-10 w-full max-w-5xl">
+                <p className="text-base text-slate-500">
+                  AI Talent Intelligence
+                </p>
+              </div>
+            </div>
+          </div>
 
-  <div className="flex items-center h-16 rounded-2xl border border-red-100 bg-white shadow-sm px-6 focus-within:ring-2 focus-within:ring-red-500">
+          {/* Navigation */}
 
-    <Search
-      size={24}
-      className="text-gray-400 flex-shrink-0"
-    />
+          <nav className="space-y-2 px-6">
 
-   <input
-  type="text"
-  value={searchTerm}
-  onChange={(e) => {
-    setSearchTerm(e.target.value);
-    setSearchResults([]);
-    setSearchError("");
+            <SidebarItem
+              icon="▦"
+              label="Dashboard"
+              active
+            />
+
+            <SidebarItem
+              icon="♧"
+              label="Candidates"
+            />
+
+            <SidebarItem
+              icon="▣"
+              label="Jobs"
+            />
+
+            <SidebarItem
+              icon="♧"
+              label="AI Search"
+            />
+
+            <SidebarItem
+              icon="▤"
+              label="Resume Vault"
+            />
+
+            <SidebarItem
+              icon="▥"
+              label="Analytics"
+            />
+
+            <SidebarItem
+              icon="〽"
+              label="Observability"
+            />
+
+            <SidebarItem
+              icon="⚙"
+              label="Settings"
+            />
+
+          </nav>
+        </aside>
+
+        {/* ========================================
+            Main Content
+        ======================================== */}
+
+        <main className="min-w-0 flex-1 bg-[#fff7f7]">
+
+          {/* Top Header */}
+
+          <header className="flex h-[102px] items-center justify-end border-b border-red-100 bg-white px-8">
+
+            <div className="flex items-center gap-6">
+
+              <button
+                type="button"
+                className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-2xl text-slate-700 transition hover:bg-red-100"
+                title="Filters"
+              >
+                ☷
+              </button>
+
+              <button
+                type="button"
+                className="text-2xl text-slate-700 transition hover:text-red-500"
+                title="Notifications"
+              >
+                ♧
+              </button>
+
+            </div>
+          </header>
+
+          {/* ========================================
+              Dashboard Content
+          ======================================== */}
+
+          <section className="px-6 py-10 lg:px-12">
+
+            {/* Heading */}
+
+            <div className="text-center">
+
+              <h2 className="text-5xl font-bold tracking-tight text-[#ff6666] lg:text-6xl">
+                TalentSphere Dashboard
+              </h2>
+
+              <p className="mt-4 text-xl text-slate-500">
+                Find the best candidates from your talent pool
+              </p>
+
+            </div>
+
+            {/* ========================================
+                Search
+            ======================================== */}
+
+            <div className="mx-auto mt-12 max-w-[1100px]">
+
+              <div
+                className={`flex items-center rounded-2xl border-2 bg-white px-7 py-5 shadow-sm transition ${
+                  searchTerm
+                    ? "border-red-500"
+                    : "border-red-100"
+                }`}
+              >
+
+                <span className="mr-5 text-3xl text-slate-400">
+                  ⌕
+                </span>
+
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) =>
+                    setSearchTerm(event.target.value)
+                  }
+                  placeholder="Search candidates, jobs or skills..."
+                  className="w-full bg-transparent text-lg text-slate-700 outline-none placeholder:text-slate-400"
+                />
+
+              </div>
+
+              {/* Search Status */}
+
+              {loading && (
+                <p className="mt-5 text-center text-base text-slate-500">
+                  Searching candidates...
+                </p>
+              )}
+
+              {!loading && searchTerm.trim() && !searchError && (
+                <p className="mt-5 text-center text-base text-slate-500">
+                  ✨ AI Powered Search
+                </p>
+              )}
+
+              {searchError && (
+                <p className="mt-5 text-center text-red-500">
+                  {searchError}
+                </p>
+              )}
+
+            </div>
+
+            {/* ========================================
+                Candidate Search Results
+            ======================================== */}
+
+            {searchTerm.trim() && !loading && !searchError && (
+              <div className="mx-auto mt-8 max-w-[1100px]">
+
+                {searchResults.length === 0 ? (
+
+                  <div className="rounded-2xl border border-red-100 bg-white px-6 py-12 text-center shadow-sm">
+                    <p className="text-lg text-slate-500">
+                      No candidates found.
+                    </p>
+                  </div>
+
+                ) : (
+
+                  <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm">
+
+                    {searchResults.map((candidate, index) => {
+
+                      const name =
+                        getCandidateName(candidate);
+
+                      const email =
+                        getCandidateEmail(candidate);
+
+                      const location =
+                        getCandidateLocation(candidate);
+
+                      const experience =
+                        getCandidateExperience(candidate);
+                        console.log("Candidate Experience Debug:", {
+  name: candidate?.full_name,
+  experience: candidate?.experience,
+  candidate
+});
+
+                      const key =
+                        getCandidateKey(
+                          candidate,
+                          index
+                        );
+
+                      return (
+                        <div
+                          key={key}
+                          className="flex items-center justify-between border-b border-slate-100 px-6 py-6 transition last:border-b-0 hover:bg-red-50"
+                        >
+
+                          {/* Candidate Information */}
+
+                          <div className="min-w-0">
+
+                            <h3 className="text-lg font-semibold text-slate-900">
+                              {name}
+                            </h3>
+
+                            <p className="mt-1 text-sm text-slate-500">
+                              {email}
+                            </p>
+
+                            <p className="mt-1 text-sm text-slate-500">
+                              {location}
+                            </p>
+
+                          </div>
+
+                          {/* Candidate Meta */}
+
+                          <div className="ml-6 flex shrink-0 flex-col items-end">
+
+                            <span className="text-lg font-medium text-red-500">
+                              {experience}{" "}
+                              {experience === "N/A"
+                                ? "years"
+                                : "years"}
+                            </span>
+
+<button
+  type="button"
+  className="mt-1 text-sm text-slate-400 transition hover:text-red-500"
+  onClick={() => {
+    console.log("Selected Candidate:", candidate);
+
+    const candidateId =
+      candidate?.id ||
+      candidate?.candidate_id ||
+      candidate?.uuid;
+
+    if (!candidateId) {
+      console.error("Candidate ID not found:", candidate);
+      return;
+    }
+
+    navigate(`/candidates/${candidateId}`);
   }}
-  onKeyDown={handleSearch}
-  placeholder="Search candidates, jobs or skills..."
-  className="ml-4 w-full bg-transparent text-lg text-gray-700 placeholder:text-gray-400 outline-none"
-/>
+>
+  View Profile →
+</button>
 
-  </div>
-  {searchLoading && (
-  <p className="mt-3 text-center text-gray-500">
-    Searching candidates...
-  </p>
-)}
+                          </div>
 
-{searchError && (
-  <p className="mt-3 text-center text-red-500">
-    {searchError}
-  </p>
-)}
+                        </div>
+                      );
+                    })}
 
-{!searchLoading && searchResults.length > 0 && (
-  <div className="mt-4 w-full max-w-3xl mx-auto rounded-xl bg-white shadow-md border border-gray-200 overflow-hidden">
-    {searchResults.map((candidate) => (
-      <div
-        key={candidate.id}
-        onClick={() => navigate(`/candidates/${candidate.id}`)}
-        className="cursor-pointer border-b border-gray-100 p-4 last:border-b-0 hover:bg-red-50"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-gray-900">
-              {candidate.full_name}
+                  </div>
+
+                )}
+
+              </div>
+            )}
+
+            {/* ========================================
+                Dashboard Statistics
+            ======================================== */}
+
+            {!searchTerm.trim() && (
+              <div className="mx-auto mt-16 grid max-w-[1100px] gap-8 md:grid-cols-2">
+
+                <DashboardCard
+                  icon="♧"
+                  title="Candidates"
+                  value="12,584"
+                  subtitle="+12% this month"
+                />
+
+                <DashboardCard
+                  icon="▣"
+                  title="Active Jobs"
+                  value="247"
+                  subtitle="18 closing soon"
+                />
+
+                <DashboardCard
+                  icon="♧"
+                  title="AI Matches"
+                  value="8,421"
+                  subtitle="+18% this month"
+                />
+
+                <DashboardCard
+                  icon="▤"
+                  title="Resumes"
+                  value="18,932"
+                  subtitle="+8% this month"
+                />
+
+              </div>
+            )}
+
+          </section>
+
+          {/* Footer */}
+
+          <footer className="border-t border-red-100 bg-white py-8 text-center">
+            <p className="text-sm text-slate-400">
+              © Built by Prince Singh
             </p>
+          </footer>
 
-            <p className="text-sm text-gray-500">
-              {candidate.email || "No email available"}
-            </p>
-
-            <p className="text-sm text-gray-500">
-              {candidate.location || "Location not available"}
-            </p>
-          </div>
-
-          <div className="text-right">
-            <p className="text-sm font-medium text-red-600">
-              {candidate.experience ?? "N/A"} years
-            </p>
-
-            <p className="text-xs text-gray-400">
-              View Profile →
-            </p>
-          </div>
-        </div>
+        </main>
       </div>
-    ))}
-  </div>
-)}
+    </div>
+  );
+}
 
-{!searchLoading &&
-  searchTerm.trim() &&
-  searchResults.length === 0 &&
-  !searchError && (
-    <p className="mt-3 text-center text-gray-500">
-      No candidates found.
-    </p>
-  )}
 
-  <div className="mt-4 flex justify-center">
-    <span className="text-gray-500 text-lg">
-      ✨ AI Powered Search
-    </span>
-  </div>
+// ========================================
+// Sidebar Item
+// ========================================
 
-</div>
+function SidebarItem({
+  icon,
+  label,
+  active = false,
+}) {
+  return (
+    <button
+      type="button"
+      className={`flex w-full items-center gap-5 rounded-xl px-5 py-4 text-left text-lg transition ${
+        active
+          ? "bg-red-50 font-semibold text-slate-900"
+          : "text-slate-700 hover:bg-red-50"
+      }`}
+    >
+      <span
+        className={`w-6 text-center text-xl ${
+          active
+            ? "text-red-500"
+            : "text-slate-700"
+        }`}
+      >
+        {icon}
+      </span>
 
-</div>
-<div className="grid grid-cols-2 gap-8 mt-14 w-full max-w-6xl">
+      <span>{label}</span>
+    </button>
+  );
+}
 
-  <DashboardCard
-    icon={Users}
-    title="Candidates"
-    value="12,584"
-    subtitle="+12% this month"
-  />
 
-  <DashboardCard
-    icon={Briefcase}
-    title="Active Jobs"
-    value="247"
-    subtitle="18 closing soon"
-  />
+// ========================================
+// Dashboard Card
+// ========================================
 
-  <DashboardCard
-    icon={BrainCircuit}
-    title="AI Matches Today"
-    value="438"
-    subtitle="96% matching accuracy"
-  />
+function DashboardCard({
+  icon,
+  title,
+  value,
+  subtitle,
+}) {
+  return (
+    <div className="rounded-2xl border border-red-100 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
 
-  <DashboardCard
-    icon={FileText}
-    title="Resume Vault"
-    value="25,000"
-    subtitle="+326 uploaded today"
-  />
+      <div className="flex items-start justify-between">
 
-</div>
-    </MainLayout>
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-2xl text-red-500">
+          {icon}
+        </div>
+
+        <span className="text-2xl text-slate-400">
+          ↗
+        </span>
+
+      </div>
+
+      <p className="mt-8 text-lg text-slate-500">
+        {title}
+      </p>
+
+      <p className="mt-2 text-4xl font-bold text-black">
+        {value}
+      </p>
+
+      <p className="mt-3 text-base text-slate-400">
+        {subtitle}
+      </p>
+
+    </div>
   );
 }

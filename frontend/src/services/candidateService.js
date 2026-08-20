@@ -1,4 +1,6 @@
-const API_URL = "http://localhost:5000/api/candidates";
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api/candidates";
 
 // ========================================
 // Get Candidate By ID
@@ -49,6 +51,7 @@ export const searchCandidates = async ({
 
   const result = await response.json();
 
-  // Search API returns the candidates array directly
-  return result;
+  console.log("Search API Response:", result);
+
+  return result.data;
 };
