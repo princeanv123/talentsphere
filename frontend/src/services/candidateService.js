@@ -1,13 +1,15 @@
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  "http://localhost:5000/api/candidates";
+  "http://localhost:5000/api";
 
 // ========================================
 // Get Candidate By ID
 // ========================================
 
 export const getCandidateById = async (candidateId) => {
-  const response = await fetch(`${API_URL}/${candidateId}`);
+  const response = await fetch(
+    `${API_URL}/candidates/${candidateId}`
+  );
 
   if (!response.ok) {
     throw new Error("Failed to fetch candidate");
@@ -42,7 +44,7 @@ export const searchCandidates = async ({
   }
 
   const response = await fetch(
-    `${API_URL}/search?${params.toString()}`
+    `${API_URL}/candidates/search?${params.toString()}`
   );
 
   if (!response.ok) {
