@@ -97,17 +97,53 @@ export default function Dashboard() {
     );
   };
 
-  function getCandidateExperience(candidate) {
+function getCandidateExperience(candidate) {
+  const experience =
+    candidate?.experience ??
+    candidate?.total_experience ??
+    candidate?.years_of_experience ??
+    candidate?.experience_years ??
+    candidate?.candidate?.experience ??
+    candidate?.candidate?.total_experience ??
+    candidate?.candidate?.years_of_experience ??
+    candidate?.candidate?.experience_years;
+
+  console.log("Candidate Experience Debug:", {
+    name:
+      candidate?.full_name ||
+      candidate?.candidate?.full_name,
+
+    experience,
+
+    topLevelExperience:
+      candidate?.experience,
+
+    totalExperience:
+      candidate?.total_experience,
+
+    yearsOfExperience:
+      candidate?.years_of_experience,
+
+    experienceYears:
+      candidate?.experience_years,
+
+    nestedExperience:
+      candidate?.candidate?.experience,
+
+    candidateObject:
+      candidate,
+  });
+
   if (
-    candidate?.experience !== null &&
-    candidate?.experience !== undefined &&
-    candidate?.experience !== ""
+    experience !== null &&
+    experience !== undefined &&
+    experience !== ""
   ) {
-    return candidate.experience;
+    return experience;
   }
 
   return "N/A";
-    }
+}
 
   const getCandidateKey = (candidate, index) => {
     /*
@@ -344,11 +380,47 @@ export default function Dashboard() {
 
                       const experience =
                         getCandidateExperience(candidate);
-                        console.log("Candidate Experience Debug:", {
-  name: candidate?.full_name,
-  experience: candidate?.experience,
-  candidate
-});
+                       console.log("======================================");
+console.log("CANDIDATE EXPERIENCE DEBUG");
+console.log("Name:", candidate?.full_name);
+
+console.log("TOP LEVEL:");
+console.log("candidate.experience:", candidate?.experience);
+console.log(
+  "candidate.total_experience:",
+  candidate?.total_experience
+);
+console.log(
+  "candidate.years_of_experience:",
+  candidate?.years_of_experience
+);
+console.log(
+  "candidate.experience_years:",
+  candidate?.experience_years
+);
+
+console.log("NESTED candidate OBJECT:");
+console.log("candidate.candidate:", candidate?.candidate);
+
+console.log("NESTED EXPERIENCE:");
+console.log(
+  "candidate.candidate.experience:",
+  candidate?.candidate?.experience
+);
+console.log(
+  "candidate.candidate.total_experience:",
+  candidate?.candidate?.total_experience
+);
+console.log(
+  "candidate.candidate.years_of_experience:",
+  candidate?.candidate?.years_of_experience
+);
+console.log(
+  "candidate.candidate.experience_years:",
+  candidate?.candidate?.experience_years
+);
+
+console.log("======================================");
 
                       const key =
                         getCandidateKey(
