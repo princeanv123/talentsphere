@@ -155,6 +155,57 @@ Potential product KPIs include:
 - Recruiter workflow completion time
 - Search-to-shortlist conversion
 
+---
+
+## 🔄 Key Product Workflows
+
+TalentSphere is designed around an end-to-end recruiter workflow.
+
+### 1. 📄 Resume Intelligence
+
+**Resume Upload → Text Extraction → AI Parsing → Structured Candidate Profile**
+
+Resumes are processed and transformed into structured candidate information such as:
+
+- Personal and professional details
+- Skills
+- Experience
+- Education
+- Certifications
+- Career information
+
+This structured representation enables downstream search and matching capabilities.
+
+### 2. 🔎 Candidate Discovery
+
+**Recruiter Search → Semantic Understanding → Candidate Retrieval → Relevant Results**
+
+Recruiters can search for candidates using natural language rather than relying only on exact keyword matches.
+
+The discovery workflow is designed to identify candidates based on the meaning and context of the search criteria.
+
+### 3. 🎯 Candidate–Job Matching
+
+**Job Requirements → Candidate Analysis → Match Evaluation → Ranked Candidates**
+
+TalentSphere evaluates candidate profiles against job requirements to identify relevant matches.
+
+The matching workflow considers candidate attributes and experience to support more informed recruiter decisions.
+
+### 4. 🤖 AI-Assisted Match Analysis
+
+**Candidate + Job → AI Analysis → Match Insights**
+
+AI is used to generate additional interpretation around the candidate-job relationship, helping recruiters understand why a candidate may be relevant rather than relying only on a numerical match score.
+
+### 5. 👤 Recruiter Decision Support
+
+**Search → Discover → Compare → Evaluate → Shortlist**
+
+The final decision remains with the recruiter.
+
+TalentSphere is designed as a decision-support product where AI reduces information-processing effort while keeping the recruiter in control of the hiring decision.
+
 ## 🏗️ Product Architecture
 
 ```text
