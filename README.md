@@ -108,6 +108,53 @@ Google Gemini is integrated into the backend to support AI-powered resume intell
 
 ---
 
+---
+
+## 🎯 Product Management Approach
+
+TalentSphere was built by applying a product-led approach to a real recruiting workflow problem.
+
+### 👥 Target Users
+
+- Recruiters
+- Talent acquisition teams
+- Hiring managers
+
+### 🔍 Core Problem
+
+Recruiters often spend significant time manually reviewing resumes,
+searching candidate databases, interpreting candidate experience,
+and comparing candidates against job requirements.
+
+TalentSphere addresses this problem by combining structured candidate
+intelligence, semantic search, and AI-powered candidate-job matching.
+
+### 💡 Product Strategy
+
+The product focuses on reducing recruiter effort across three key stages:
+
+1. **Understand** — Convert unstructured resumes into structured candidate intelligence.
+2. **Discover** — Find relevant candidates using semantic search and AI-assisted discovery.
+3. **Match** — Compare candidates against job requirements and surface the strongest matches.
+
+### 🧭 Key Product Decisions
+
+- Structured resume parsing instead of relying only on keyword search
+- Semantic candidate discovery instead of exact keyword matching
+- AI-assisted candidate-job matching to support recruiter decision-making
+- Modular backend services to allow matching capabilities to evolve independently
+- Human-in-the-loop workflows so AI supports recruiter decisions rather than replacing them
+
+### 📊 Product Success Measures
+
+Potential product KPIs include:
+
+- Time to identify qualified candidates
+- Candidate search relevance
+- Candidate-job match quality
+- Recruiter workflow completion time
+- Search-to-shortlist conversion
+
 ## 🏗️ Product Architecture
 
 ```text
