@@ -1,35 +1,109 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Activity,
+  BarChart3,
+  Bell,
+  BrainCircuit,
+  Briefcase,
+  ChevronRight,
+  FileText,
+  Filter,
+  LayoutDashboard,
+  Menu,
+  Search,
+  Settings,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
+
 import { searchCandidates } from "../../services/candidateService";
 
 export default function Dashboard() {
   const navigate = useNavigate();
 
-  // ========================================
-  // Search State
-  // ========================================
+  // =========================================================
+  // STATE
+  // =========================================================
 
-  // What the user is currently typing
   const [searchTerm, setSearchTerm] = useState("");
-
-  // The query that was actually submitted
-  const [submittedSearchTerm, setSubmittedSearchTerm] =
-    useState("");
-
+  const [submittedSearchTerm, setSubmittedSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
 
-  // ========================================
-  // Search Candidates
-  // Runs ONLY when Search is clicked
-  // or Enter is pressed
-  // ========================================
+  // Mobile sidebar
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleSearch = async () => {
+  // =========================================================
+  // SEARCH
+  // =========================================================
+
+  useEffect(() => {
+    const keyword = submittedSearchTerm.trim();
+
+    if (!keyword) {
+      setSearchResults([]);
+      setSearchError("");
+      setLoading(false);
+      return;
+    }
+
+    const runSearch = async () => {
+      try {
+        setLoading(true);
+        setSearchError("");
+
+        console.log("======================================");
+        console.log("DASHBOARD SEARCH");
+        console.log("Submitted Query:", keyword);
+        console.log("======================================");
+
+        const results = await searchCandidates({
+          keyword,
+        });
+
+        console.log("Candidate Search Results:", results);
+
+        /*
+         * candidateService normally returns result.data.
+         *
+         * This defensive handling also supports the case
+         * where the service returns the complete API response.
+         */
+        const candidates = Array.isArray(results)
+          ? results
+          : Array.isArray(results?.data)
+            ? results.data
+            : [];
+
+        console.log("Candidates to render:", candidates);
+
+        setSearchResults(candidates);
+      } catch (error) {
+        console.error("Candidate search error:", error);
+
+        setSearchResults([]);
+
+        setSearchError(
+          error?.message || "Unable to search candidates"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    runSearch();
+  }, [submittedSearchTerm]);
+
+  // =========================================================
+  // SEARCH HANDLERS
+  // =========================================================
+
+  const handleSearch = () => {
     const keyword = searchTerm.trim();
 
-    // Empty search
     if (!keyword) {
       setSubmittedSearchTerm("");
       setSearchResults([]);
@@ -37,68 +111,8 @@ export default function Dashboard() {
       return;
     }
 
-    try {
-      setLoading(true);
-      setSearchError("");
-
-      // Store the query that was actually submitted
-      setSubmittedSearchTerm(keyword);
-
-      console.log("======================================");
-      console.log("DASHBOARD SEARCH");
-      console.log("Submitted Query:", keyword);
-      console.log("======================================");
-
-      const results = await searchCandidates({
-        keyword,
-      });
-
-      console.log(
-        "Candidate Search Results:",
-        results
-      );
-
-      /*
-        candidateService normally returns result.data.
-
-        This defensive handling also supports the case
-        where the service returns the complete API response.
-      */
-
-      const candidates = Array.isArray(results)
-        ? results
-        : Array.isArray(results?.data)
-          ? results.data
-          : [];
-
-      console.log(
-        "Candidates to render:",
-        candidates
-      );
-
-      setSearchResults(candidates);
-
-    } catch (error) {
-      console.error(
-        "Candidate search error:",
-        error
-      );
-
-      setSearchResults([]);
-
-      setSearchError(
-        error?.message ||
-          "Unable to search candidates"
-      );
-
-    } finally {
-      setLoading(false);
-    }
+    setSubmittedSearchTerm(keyword);
   };
-
-  // ========================================
-  // Search Input - Enter Shortcut
-  // ========================================
 
   const handleSearchKeyDown = (event) => {
     if (event.key === "Enter") {
@@ -107,9 +121,9 @@ export default function Dashboard() {
     }
   };
 
-  // ========================================
-  // Candidate Helpers
-  // ========================================
+  // =========================================================
+  // CANDIDATE HELPERS
+  // =========================================================
 
   const getCandidateName = (candidate) => {
     return (
@@ -121,10 +135,7 @@ export default function Dashboard() {
   };
 
   const getCandidateEmail = (candidate) => {
-    return (
-      candidate?.email ||
-      "Email not available"
-    );
+    return candidate?.email || "Email not available";
   };
 
   const getCandidateLocation = (candidate) => {
@@ -136,6 +147,12 @@ export default function Dashboard() {
   };
 
   const getCandidateExperience = (candidate) => {
+    /*
+     * Current backend returns candidate fields at the top level.
+     *
+     * The nested candidate fallback is retained for compatibility
+     * with older search responses.
+     */
     const experience =
       candidate?.experience ??
       candidate?.total_experience ??
@@ -157,10 +174,7 @@ export default function Dashboard() {
     return "N/A";
   };
 
-  const getCandidateKey = (
-    candidate,
-    index
-  ) => {
+  const getCandidateKey = (candidate, index) => {
     return (
       candidate?.id ||
       candidate?.candidate_id ||
@@ -170,201 +184,242 @@ export default function Dashboard() {
     );
   };
 
-  // ========================================
-  // Render
-  // ========================================
+  // =========================================================
+  // MOBILE MENU
+  // =========================================================
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
+
+  const handleNavigation = (label) => {
+    closeMobileMenu();
+
+    switch (label) {
+      case "Dashboard":
+        navigate("/dashboard");
+        break;
+
+      case "Candidates":
+        navigate("/candidates");
+        break;
+
+      default:
+        /*
+         * These pages are not connected yet.
+         */
+        console.log(`${label} navigation clicked`);
+        break;
+    }
+  };
+
+  // Close mobile menu with Escape
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        closeMobileMenu();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  // =========================================================
+  // RENDER
+  // =========================================================
 
   return (
     <div className="min-h-screen bg-white text-slate-800">
 
       <div className="flex min-h-screen">
 
-        {/* ========================================
-            Sidebar
-        ======================================== */}
+        {/* ===================================================
+            DESKTOP SIDEBAR
+        =================================================== */}
 
-        <aside className="hidden w-[308px] shrink-0 border-r border-red-100 bg-white lg:block">
+        <aside className="hidden h-screen w-[308px] shrink-0 overflow-y-auto border-r border-red-100 bg-white lg:block">
 
-          {/* Logo */}
-
-          <div className="px-6 pt-10 pb-12">
-
-            <div className="flex items-center gap-3">
-
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border-4 border-red-500 text-2xl font-bold text-red-500">
-                O
-              </div>
-
-              <div>
-
-                <h1 className="text-4xl font-bold tracking-tight text-red-500">
-                  TalentSphere
-                </h1>
-
-                <p className="text-base text-slate-500">
-                  AI Talent Intelligence
-                </p>
-
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* Navigation */}
-
-          <nav className="space-y-2 px-6">
-
-            <SidebarItem
-              icon="▦"
-              label="Dashboard"
-              active
-            />
-
-            <SidebarItem
-              icon="♧"
-              label="Candidates"
-            />
-
-            <SidebarItem
-              icon="▣"
-              label="Jobs"
-            />
-
-            <SidebarItem
-              icon="♧"
-              label="AI Search"
-            />
-
-            <SidebarItem
-              icon="▤"
-              label="Resume Vault"
-            />
-
-            <SidebarItem
-              icon="▥"
-              label="Analytics"
-            />
-
-            <SidebarItem
-              icon="〽"
-              label="Observability"
-            />
-
-            <SidebarItem
-              icon="⚙"
-              label="Settings"
-            />
-
-          </nav>
+          <SidebarContent
+            active="Dashboard"
+            onNavigate={handleNavigation}
+          />
 
         </aside>
 
-        {/* ========================================
-            Main Content
-        ======================================== */}
+        {/* ===================================================
+            MOBILE SIDEBAR OVERLAY
+        =================================================== */}
+
+        {mobileMenuOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+            onClick={closeMobileMenu}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* ===================================================
+            MOBILE SIDEBAR
+        =================================================== */}
+
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 h-screen w-[290px] overflow-y-auto border-r border-red-100 bg-white shadow-xl transition-transform duration-300 ease-in-out lg:hidden ${
+            mobileMenuOpen
+              ? "translate-x-0"
+              : "-translate-x-full"
+          }`}
+        >
+
+          {/* Mobile Sidebar Header */}
+
+          <div className="flex items-center justify-between border-b border-red-100 px-5 py-5">
+
+            <div>
+              <h2 className="text-xl font-bold text-red-500">
+                TalentSphere
+              </h2>
+
+              <p className="text-xs text-slate-500">
+                AI Talent Intelligence
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={closeMobileMenu}
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-red-50 hover:text-red-500"
+              aria-label="Close menu"
+            >
+              <X size={24} />
+            </button>
+
+          </div>
+
+          <SidebarContent
+            active="Dashboard"
+            onNavigate={handleNavigation}
+          />
+
+        </aside>
+
+        {/* ===================================================
+            MAIN CONTENT
+        =================================================== */}
 
         <main className="min-w-0 flex-1 bg-[#fff7f7]">
 
-          {/* ========================================
-              Header
-          ======================================== */}
+          {/* =================================================
+              TOP HEADER
+          ================================================= */}
 
-          <header className="flex h-[102px] items-center justify-end border-b border-red-100 bg-white px-8">
+          <header className="flex h-[90px] items-center justify-between border-b border-red-100 bg-white px-5 sm:px-8">
 
-            <div className="flex items-center gap-6">
+            {/* Mobile Menu Button */}
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-slate-700 transition hover:bg-red-100 hover:text-red-500 lg:hidden"
+              aria-label="Open menu"
+              aria-expanded={mobileMenuOpen}
+            >
+              <Menu size={25} />
+            </button>
+
+            {/* Desktop Spacer */}
+
+            <div className="hidden lg:block" />
+
+            {/* Header Actions */}
+
+            <div className="flex items-center gap-4 sm:gap-6">
 
               <button
                 type="button"
-                className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-2xl text-slate-700 transition hover:bg-red-100"
+                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-slate-700 transition hover:bg-red-100 hover:text-red-500"
                 title="Filters"
+                aria-label="Filters"
               >
-                ☷
+                <Filter size={20} />
               </button>
 
               <button
                 type="button"
-                className="text-2xl text-slate-700 transition hover:text-red-500"
+                className="text-slate-700 transition hover:text-red-500"
                 title="Notifications"
+                aria-label="Notifications"
               >
-                ♧
+                <Bell size={22} />
               </button>
 
             </div>
 
           </header>
 
-          {/* ========================================
-              Dashboard Content
-          ======================================== */}
+          {/* =================================================
+              DASHBOARD CONTENT
+          ================================================= */}
 
-          <section className="px-6 py-10 lg:px-12">
+          <section className="px-5 py-8 sm:px-8 sm:py-10 lg:px-12">
 
-            {/* ========================================
-                Heading
-            ======================================== */}
+            {/* Heading */}
 
             <div className="text-center">
 
-              <h2 className="text-5xl font-bold tracking-tight text-[#ff6666] lg:text-6xl">
+              <h1 className="text-4xl font-bold tracking-tight text-[#ff6666] sm:text-5xl lg:text-6xl">
                 TalentSphere Dashboard
-              </h2>
+              </h1>
 
-              <p className="mt-4 text-xl text-slate-500">
+              <p className="mt-4 text-base text-slate-500 sm:text-xl">
                 Find the best candidates from your talent pool
               </p>
 
             </div>
 
-            {/* ========================================
-                Search Box
-            ======================================== */}
+            {/* =================================================
+                SEARCH
+            ================================================= */}
 
-            <div className="mx-auto mt-12 max-w-[1100px]">
+            <div className="mx-auto mt-10 max-w-[1100px]">
 
-              <div className="flex items-center gap-3 rounded-2xl border-2 border-red-100 bg-white px-5 py-3 shadow-sm transition focus-within:border-red-500">
+              <div className="flex flex-col gap-3 rounded-2xl border-2 border-red-100 bg-white p-3 shadow-sm transition focus-within:border-red-300 sm:flex-row sm:items-center sm:px-5 sm:py-3">
 
-                {/* Search Icon */}
+                <div className="flex min-w-0 flex-1 items-center">
 
-                <span className="text-3xl text-slate-400">
-                  ⌕
-                </span>
+                  <Search
+                    size={28}
+                    className="mr-4 shrink-0 text-slate-400"
+                  />
 
-                {/* Search Input */}
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) =>
+                      setSearchTerm(event.target.value)
+                    }
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder="Search candidates, jobs or skills..."
+                    className="w-full min-w-0 bg-transparent py-2 text-base text-slate-700 outline-none placeholder:text-slate-400 sm:text-lg"
+                  />
 
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(event) =>
-                    setSearchTerm(
-                      event.target.value
-                    )
-                  }
-                  onKeyDown={
-                    handleSearchKeyDown
-                  }
-                  placeholder="Search candidates, jobs or skills..."
-                  className="w-full bg-transparent px-2 py-3 text-lg text-slate-700 outline-none placeholder:text-slate-400"
-                />
-
-                {/* Search Button */}
+                </div>
 
                 <button
                   type="button"
                   onClick={handleSearch}
                   disabled={loading}
-                  className="shrink-0 rounded-xl bg-red-500 px-7 py-3 text-base font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-xl bg-red-500 px-7 py-3 font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  {loading
-                    ? "Searching..."
-                    : "Search"}
+                  {loading ? "Searching..." : "Search"}
                 </button>
 
               </div>
 
-              {/* ========================================
-                  Search Status
-              ======================================== */}
+              {/* Search Status */}
 
               {loading && (
                 <p className="mt-5 text-center text-base text-slate-500">
@@ -375,8 +430,9 @@ export default function Dashboard() {
               {!loading &&
                 submittedSearchTerm.trim() &&
                 !searchError && (
-                  <p className="mt-5 text-center text-base text-slate-500">
-                    ✨ AI Powered Search
+                  <p className="mt-5 flex items-center justify-center gap-2 text-base text-slate-500">
+                    <Sparkles size={17} />
+                    AI Powered Search
                   </p>
                 )}
 
@@ -388,9 +444,9 @@ export default function Dashboard() {
 
             </div>
 
-            {/* ========================================
-                Candidate Search Results
-            ======================================== */}
+            {/* =================================================
+                CANDIDATE SEARCH RESULTS
+            ================================================= */}
 
             {submittedSearchTerm.trim() &&
               !loading &&
@@ -398,26 +454,17 @@ export default function Dashboard() {
 
                 <div className="mx-auto mt-8 max-w-[1100px]">
 
-                  {/* ========================================
-                      No Results
-                  ======================================== */}
-
                   {searchResults.length === 0 ? (
 
                     <div className="rounded-2xl border border-red-100 bg-white px-6 py-12 text-center shadow-sm">
 
                       <p className="text-lg text-slate-500">
-                        No matching profiles found
-                        in the current talent pool.
+                        No candidates found.
                       </p>
 
                     </div>
 
                   ) : (
-
-                    /* ========================================
-                       Results
-                    ======================================== */
 
                     <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm">
 
@@ -425,24 +472,16 @@ export default function Dashboard() {
                         (candidate, index) => {
 
                           const name =
-                            getCandidateName(
-                              candidate
-                            );
+                            getCandidateName(candidate);
 
                           const email =
-                            getCandidateEmail(
-                              candidate
-                            );
+                            getCandidateEmail(candidate);
 
                           const location =
-                            getCandidateLocation(
-                              candidate
-                            );
+                            getCandidateLocation(candidate);
 
                           const experience =
-                            getCandidateExperience(
-                              candidate
-                            );
+                            getCandidateExperience(candidate);
 
                           const key =
                             getCandidateKey(
@@ -459,7 +498,7 @@ export default function Dashboard() {
 
                             <div
                               key={key}
-                              className="flex items-center justify-between border-b border-slate-100 px-6 py-6 transition last:border-b-0 hover:bg-red-50"
+                              className="flex flex-col gap-5 border-b border-slate-100 px-5 py-6 transition last:border-b-0 hover:bg-red-50 sm:flex-row sm:items-center sm:justify-between sm:px-6"
                             >
 
                               {/* Candidate Information */}
@@ -470,7 +509,7 @@ export default function Dashboard() {
                                   {name}
                                 </h3>
 
-                                <p className="mt-1 text-sm text-slate-500">
+                                <p className="mt-1 break-all text-sm text-slate-500">
                                   {email}
                                 </p>
 
@@ -482,7 +521,7 @@ export default function Dashboard() {
 
                               {/* Candidate Meta */}
 
-                              <div className="ml-6 flex shrink-0 flex-col items-end">
+                              <div className="flex shrink-0 flex-col items-start sm:ml-6 sm:items-end">
 
                                 <span className="text-lg font-medium text-red-500">
                                   {experience} years
@@ -491,12 +530,10 @@ export default function Dashboard() {
                                 <button
                                   type="button"
                                   disabled={!candidateId}
-                                  className="mt-1 text-sm text-slate-400 transition hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="mt-1 flex items-center gap-1 text-sm text-slate-400 transition hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
                                   onClick={() => {
 
-                                    if (
-                                      !candidateId
-                                    ) {
+                                    if (!candidateId) {
                                       console.error(
                                         "Candidate ID not found:",
                                         candidate
@@ -504,18 +541,15 @@ export default function Dashboard() {
                                       return;
                                     }
 
-                                    console.log(
-                                      "Selected Candidate:",
-                                      candidate
-                                    );
-
                                     navigate(
                                       `/candidates/${candidateId}`
                                     );
 
                                   }}
                                 >
-                                  View Profile →
+                                  View Profile
+                                  <ChevronRight size={15} />
+
                                 </button>
 
                               </div>
@@ -534,37 +568,37 @@ export default function Dashboard() {
 
               )}
 
-            {/* ========================================
-                Dashboard Statistics
-            ======================================== */}
+            {/* =================================================
+                DASHBOARD STATISTICS
+            ================================================= */}
 
             {!submittedSearchTerm.trim() && (
 
-              <div className="mx-auto mt-16 grid max-w-[1100px] gap-8 md:grid-cols-2">
+              <div className="mx-auto mt-14 grid max-w-[1100px] gap-6 md:grid-cols-2 lg:gap-8">
 
                 <DashboardCard
-                  icon="♧"
+                  icon={<Users size={25} />}
                   title="Candidates"
                   value="12,584"
                   subtitle="+12% this month"
                 />
 
                 <DashboardCard
-                  icon="▣"
+                  icon={<Briefcase size={25} />}
                   title="Active Jobs"
                   value="247"
                   subtitle="18 closing soon"
                 />
 
                 <DashboardCard
-                  icon="♧"
+                  icon={<BrainCircuit size={25} />}
                   title="AI Matches"
                   value="8,421"
                   subtitle="+18% this month"
                 />
 
                 <DashboardCard
-                  icon="▤"
+                  icon={<FileText size={25} />}
                   title="Resumes"
                   value="18,932"
                   subtitle="+8% this month"
@@ -576,9 +610,9 @@ export default function Dashboard() {
 
           </section>
 
-          {/* ========================================
-              Footer
-          ======================================== */}
+          {/* =================================================
+              FOOTER
+          ================================================= */}
 
           <footer className="border-t border-red-100 bg-white py-8 text-center">
 
@@ -597,27 +631,142 @@ export default function Dashboard() {
 }
 
 
-// ========================================
-// Sidebar Item
-// ========================================
+// ============================================================
+// SIDEBAR CONTENT
+// ============================================================
+
+function SidebarContent({
+  active,
+  onNavigate,
+}) {
+
+  const menuItems = [
+    {
+      icon: LayoutDashboard,
+      label: "Dashboard",
+    },
+    {
+      icon: Users,
+      label: "Candidates",
+    },
+    {
+      icon: Briefcase,
+      label: "Jobs",
+    },
+    {
+      icon: BrainCircuit,
+      label: "AI Search",
+    },
+    {
+      icon: FileText,
+      label: "Resume Vault",
+    },
+    {
+      icon: BarChart3,
+      label: "Analytics",
+    },
+    {
+      icon: Activity,
+      label: "Observability",
+    },
+    {
+      icon: Settings,
+      label: "Settings",
+    },
+  ];
+
+  return (
+    <div className="flex min-h-full flex-col">
+
+      {/* Logo */}
+
+      <div className="px-6 pt-10 pb-12">
+
+        <div className="flex items-center gap-3">
+
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-4 border-red-500 text-2xl font-bold text-red-500">
+            O
+          </div>
+
+          <div>
+
+            <h2 className="text-4xl font-bold tracking-tight text-red-500">
+              TalentSphere
+            </h2>
+
+            <p className="text-base text-slate-500">
+              AI Talent Intelligence
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* Navigation */}
+
+      <nav className="space-y-2 px-6">
+
+        {menuItems.map((item) => {
+
+          const Icon = item.icon;
+
+          return (
+            <SidebarItem
+              key={item.label}
+              icon={<Icon size={21} />}
+              label={item.label}
+              active={active === item.label}
+              onClick={() =>
+                onNavigate(item.label)
+              }
+            />
+          );
+
+        })}
+
+      </nav>
+
+      {/* Sidebar Footer */}
+
+      <div className="mt-auto px-6 py-8">
+
+        <p className="text-xs text-gray-400">
+          © Built by Prince Singh
+        </p>
+
+      </div>
+
+    </div>
+  );
+}
+
+
+// ============================================================
+// SIDEBAR ITEM
+// ============================================================
 
 function SidebarItem({
   icon,
   label,
   active = false,
+  onClick,
 }) {
+
   return (
     <button
       type="button"
+      onClick={onClick}
       className={`flex w-full items-center gap-5 rounded-xl px-5 py-4 text-left text-lg transition ${
         active
           ? "bg-red-50 font-semibold text-slate-900"
-          : "text-slate-700 hover:bg-red-50"
+          : "text-slate-700 hover:bg-red-50 hover:text-red-600"
       }`}
     >
 
       <span
-        className={`w-6 text-center text-xl ${
+        className={`flex w-6 shrink-0 items-center justify-center ${
           active
             ? "text-red-500"
             : "text-slate-700"
@@ -626,16 +775,18 @@ function SidebarItem({
         {icon}
       </span>
 
-      <span>{label}</span>
+      <span>
+        {label}
+      </span>
 
     </button>
   );
 }
 
 
-// ========================================
-// Dashboard Card
-// ========================================
+// ============================================================
+// DASHBOARD CARD
+// ============================================================
 
 function DashboardCard({
   icon,
@@ -643,18 +794,20 @@ function DashboardCard({
   value,
   subtitle,
 }) {
+
   return (
-    <div className="rounded-2xl border border-red-100 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+    <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:p-7">
 
       <div className="flex items-start justify-between">
 
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-2xl text-red-500">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500">
           {icon}
         </div>
 
-        <span className="text-2xl text-slate-400">
-          ↗
-        </span>
+        <ChevronRight
+          size={24}
+          className="text-slate-400"
+        />
 
       </div>
 
