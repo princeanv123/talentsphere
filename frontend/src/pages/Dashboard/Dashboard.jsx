@@ -1,79 +1,114 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { searchCandidates } from "../../services/candidateService";
 
-
 export default function Dashboard() {
   const navigate = useNavigate();
+
   // ========================================
-  // State
+  // Search State
   // ========================================
 
+  // What the user is currently typing
   const [searchTerm, setSearchTerm] = useState("");
+
+  // The query that was actually submitted
+  const [submittedSearchTerm, setSubmittedSearchTerm] =
+    useState("");
+
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
 
   // ========================================
   // Search Candidates
+  // Runs ONLY when Search is clicked
+  // or Enter is pressed
   // ========================================
 
-  useEffect(() => {
+  const handleSearch = async () => {
     const keyword = searchTerm.trim();
 
-    // Clear results when search box is empty
+    // Empty search
     if (!keyword) {
+      setSubmittedSearchTerm("");
       setSearchResults([]);
       setSearchError("");
-      setLoading(false);
       return;
     }
 
-    const timer = setTimeout(async () => {
-      try {
-        setLoading(true);
-        setSearchError("");
+    try {
+      setLoading(true);
+      setSearchError("");
 
-        const results = await searchCandidates({
-          keyword,
-        });
+      // Store the query that was actually submitted
+      setSubmittedSearchTerm(keyword);
 
-        console.log("Candidate Search Results:", results);
+      console.log("======================================");
+      console.log("DASHBOARD SEARCH");
+      console.log("Submitted Query:", keyword);
+      console.log("======================================");
 
-        /*
-          candidateService currently returns result.data.
+      const results = await searchCandidates({
+        keyword,
+      });
 
-          However, we keep this defensive check so Dashboard
-          continues to work even if the service ever returns
-          the complete API response object.
-        */
+      console.log(
+        "Candidate Search Results:",
+        results
+      );
 
-        const candidates = Array.isArray(results)
-          ? results
-          : Array.isArray(results?.data)
-            ? results.data
-            : [];
+      /*
+        candidateService normally returns result.data.
 
-        console.log("Candidates to render:", candidates);
+        This defensive handling also supports the case
+        where the service returns the complete API response.
+      */
 
-        setSearchResults(candidates);
-      } catch (error) {
-        console.error("Candidate search error:", error);
+      const candidates = Array.isArray(results)
+        ? results
+        : Array.isArray(results?.data)
+          ? results.data
+          : [];
 
-        setSearchResults([]);
-        setSearchError(
-          error?.message || "Unable to search candidates"
-        );
-      } finally {
-        setLoading(false);
-      }
-    }, 400);
+      console.log(
+        "Candidates to render:",
+        candidates
+      );
 
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+      setSearchResults(candidates);
+
+    } catch (error) {
+      console.error(
+        "Candidate search error:",
+        error
+      );
+
+      setSearchResults([]);
+
+      setSearchError(
+        error?.message ||
+          "Unable to search candidates"
+      );
+
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ========================================
-  // Helpers
+  // Search Input - Enter Shortcut
+  // ========================================
+
+  const handleSearchKeyDown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleSearch();
+    }
+  };
+
+  // ========================================
+  // Candidate Helpers
   // ========================================
 
   const getCandidateName = (candidate) => {
@@ -86,7 +121,10 @@ export default function Dashboard() {
   };
 
   const getCandidateEmail = (candidate) => {
-    return candidate?.email || "Email not available";
+    return (
+      candidate?.email ||
+      "Email not available"
+    );
   };
 
   const getCandidateLocation = (candidate) => {
@@ -97,63 +135,32 @@ export default function Dashboard() {
     );
   };
 
-function getCandidateExperience(candidate) {
-  const experience =
-    candidate?.experience ??
-    candidate?.total_experience ??
-    candidate?.years_of_experience ??
-    candidate?.experience_years ??
-    candidate?.candidate?.experience ??
-    candidate?.candidate?.total_experience ??
-    candidate?.candidate?.years_of_experience ??
-    candidate?.candidate?.experience_years;
+  const getCandidateExperience = (candidate) => {
+    const experience =
+      candidate?.experience ??
+      candidate?.total_experience ??
+      candidate?.years_of_experience ??
+      candidate?.experience_years ??
+      candidate?.candidate?.experience ??
+      candidate?.candidate?.total_experience ??
+      candidate?.candidate?.years_of_experience ??
+      candidate?.candidate?.experience_years;
 
-  console.log("Candidate Experience Debug:", {
-    name:
-      candidate?.full_name ||
-      candidate?.candidate?.full_name,
+    if (
+      experience !== null &&
+      experience !== undefined &&
+      experience !== ""
+    ) {
+      return experience;
+    }
 
-    experience,
+    return "N/A";
+  };
 
-    topLevelExperience:
-      candidate?.experience,
-
-    totalExperience:
-      candidate?.total_experience,
-
-    yearsOfExperience:
-      candidate?.years_of_experience,
-
-    experienceYears:
-      candidate?.experience_years,
-
-    nestedExperience:
-      candidate?.candidate?.experience,
-
-    candidateObject:
-      candidate,
-  });
-
-  if (
-    experience !== null &&
-    experience !== undefined &&
-    experience !== ""
-  ) {
-    return experience;
-  }
-
-  return "N/A";
-}
-
-  const getCandidateKey = (candidate, index) => {
-    /*
-      The backend data currently appears to have some records
-      where "id" is undefined.
-
-      Use the strongest available unique identifier first,
-      then email, then index as the final fallback.
-    */
-
+  const getCandidateKey = (
+    candidate,
+    index
+  ) => {
     return (
       candidate?.id ||
       candidate?.candidate_id ||
@@ -169,6 +176,7 @@ function getCandidateExperience(candidate) {
 
   return (
     <div className="min-h-screen bg-white text-slate-800">
+
       <div className="flex min-h-screen">
 
         {/* ========================================
@@ -180,12 +188,15 @@ function getCandidateExperience(candidate) {
           {/* Logo */}
 
           <div className="px-6 pt-10 pb-12">
+
             <div className="flex items-center gap-3">
+
               <div className="flex h-12 w-12 items-center justify-center rounded-full border-4 border-red-500 text-2xl font-bold text-red-500">
                 O
               </div>
 
               <div>
+
                 <h1 className="text-4xl font-bold tracking-tight text-red-500">
                   TalentSphere
                 </h1>
@@ -193,8 +204,11 @@ function getCandidateExperience(candidate) {
                 <p className="text-base text-slate-500">
                   AI Talent Intelligence
                 </p>
+
               </div>
+
             </div>
+
           </div>
 
           {/* Navigation */}
@@ -243,6 +257,7 @@ function getCandidateExperience(candidate) {
             />
 
           </nav>
+
         </aside>
 
         {/* ========================================
@@ -251,7 +266,9 @@ function getCandidateExperience(candidate) {
 
         <main className="min-w-0 flex-1 bg-[#fff7f7]">
 
-          {/* Top Header */}
+          {/* ========================================
+              Header
+          ======================================== */}
 
           <header className="flex h-[102px] items-center justify-end border-b border-red-100 bg-white px-8">
 
@@ -274,6 +291,7 @@ function getCandidateExperience(candidate) {
               </button>
 
             </div>
+
           </header>
 
           {/* ========================================
@@ -282,7 +300,9 @@ function getCandidateExperience(candidate) {
 
           <section className="px-6 py-10 lg:px-12">
 
-            {/* Heading */}
+            {/* ========================================
+                Heading
+            ======================================== */}
 
             <div className="text-center">
 
@@ -297,36 +317,54 @@ function getCandidateExperience(candidate) {
             </div>
 
             {/* ========================================
-                Search
+                Search Box
             ======================================== */}
 
             <div className="mx-auto mt-12 max-w-[1100px]">
 
-              <div
-                className={`flex items-center rounded-2xl border-2 bg-white px-7 py-5 shadow-sm transition ${
-                  searchTerm
-                    ? "border-red-500"
-                    : "border-red-100"
-                }`}
-              >
+              <div className="flex items-center gap-3 rounded-2xl border-2 border-red-100 bg-white px-5 py-3 shadow-sm transition focus-within:border-red-500">
 
-                <span className="mr-5 text-3xl text-slate-400">
+                {/* Search Icon */}
+
+                <span className="text-3xl text-slate-400">
                   ⌕
                 </span>
+
+                {/* Search Input */}
 
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(event) =>
-                    setSearchTerm(event.target.value)
+                    setSearchTerm(
+                      event.target.value
+                    )
+                  }
+                  onKeyDown={
+                    handleSearchKeyDown
                   }
                   placeholder="Search candidates, jobs or skills..."
-                  className="w-full bg-transparent text-lg text-slate-700 outline-none placeholder:text-slate-400"
+                  className="w-full bg-transparent px-2 py-3 text-lg text-slate-700 outline-none placeholder:text-slate-400"
                 />
+
+                {/* Search Button */}
+
+                <button
+                  type="button"
+                  onClick={handleSearch}
+                  disabled={loading}
+                  className="shrink-0 rounded-xl bg-red-500 px-7 py-3 text-base font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading
+                    ? "Searching..."
+                    : "Search"}
+                </button>
 
               </div>
 
-              {/* Search Status */}
+              {/* ========================================
+                  Search Status
+              ======================================== */}
 
               {loading && (
                 <p className="mt-5 text-center text-base text-slate-500">
@@ -334,11 +372,13 @@ function getCandidateExperience(candidate) {
                 </p>
               )}
 
-              {!loading && searchTerm.trim() && !searchError && (
-                <p className="mt-5 text-center text-base text-slate-500">
-                  ✨ AI Powered Search
-                </p>
-              )}
+              {!loading &&
+                submittedSearchTerm.trim() &&
+                !searchError && (
+                  <p className="mt-5 text-center text-base text-slate-500">
+                    ✨ AI Powered Search
+                  </p>
+                )}
 
               {searchError && (
                 <p className="mt-5 text-center text-red-500">
@@ -352,157 +392,154 @@ function getCandidateExperience(candidate) {
                 Candidate Search Results
             ======================================== */}
 
-            {searchTerm.trim() && !loading && !searchError && (
-              <div className="mx-auto mt-8 max-w-[1100px]">
+            {submittedSearchTerm.trim() &&
+              !loading &&
+              !searchError && (
 
-                {searchResults.length === 0 ? (
+                <div className="mx-auto mt-8 max-w-[1100px]">
 
-                  <div className="rounded-2xl border border-red-100 bg-white px-6 py-12 text-center shadow-sm">
-                    <p className="text-lg text-slate-500">
-                      No candidates found.
-                    </p>
-                  </div>
+                  {/* ========================================
+                      No Results
+                  ======================================== */}
 
-                ) : (
+                  {searchResults.length === 0 ? (
 
-                  <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm">
+                    <div className="rounded-2xl border border-red-100 bg-white px-6 py-12 text-center shadow-sm">
 
-                    {searchResults.map((candidate, index) => {
+                      <p className="text-lg text-slate-500">
+                        No matching profiles found
+                        in the current talent pool.
+                      </p>
 
-                      const name =
-                        getCandidateName(candidate);
+                    </div>
 
-                      const email =
-                        getCandidateEmail(candidate);
+                  ) : (
 
-                      const location =
-                        getCandidateLocation(candidate);
+                    /* ========================================
+                       Results
+                    ======================================== */
 
-                      const experience =
-                        getCandidateExperience(candidate);
-                       console.log("======================================");
-console.log("CANDIDATE EXPERIENCE DEBUG");
-console.log("Name:", candidate?.full_name);
+                    <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm">
 
-console.log("TOP LEVEL:");
-console.log("candidate.experience:", candidate?.experience);
-console.log(
-  "candidate.total_experience:",
-  candidate?.total_experience
-);
-console.log(
-  "candidate.years_of_experience:",
-  candidate?.years_of_experience
-);
-console.log(
-  "candidate.experience_years:",
-  candidate?.experience_years
-);
+                      {searchResults.map(
+                        (candidate, index) => {
 
-console.log("NESTED candidate OBJECT:");
-console.log("candidate.candidate:", candidate?.candidate);
+                          const name =
+                            getCandidateName(
+                              candidate
+                            );
 
-console.log("NESTED EXPERIENCE:");
-console.log(
-  "candidate.candidate.experience:",
-  candidate?.candidate?.experience
-);
-console.log(
-  "candidate.candidate.total_experience:",
-  candidate?.candidate?.total_experience
-);
-console.log(
-  "candidate.candidate.years_of_experience:",
-  candidate?.candidate?.years_of_experience
-);
-console.log(
-  "candidate.candidate.experience_years:",
-  candidate?.candidate?.experience_years
-);
+                          const email =
+                            getCandidateEmail(
+                              candidate
+                            );
 
-console.log("======================================");
+                          const location =
+                            getCandidateLocation(
+                              candidate
+                            );
 
-                      const key =
-                        getCandidateKey(
-                          candidate,
-                          index
-                        );
+                          const experience =
+                            getCandidateExperience(
+                              candidate
+                            );
 
-                      return (
-                        <div
-                          key={key}
-                          className="flex items-center justify-between border-b border-slate-100 px-6 py-6 transition last:border-b-0 hover:bg-red-50"
-                        >
+                          const key =
+                            getCandidateKey(
+                              candidate,
+                              index
+                            );
 
-                          {/* Candidate Information */}
+                          const candidateId =
+                            candidate?.id ||
+                            candidate?.candidate_id ||
+                            candidate?.uuid;
 
-                          <div className="min-w-0">
+                          return (
 
-                            <h3 className="text-lg font-semibold text-slate-900">
-                              {name}
-                            </h3>
+                            <div
+                              key={key}
+                              className="flex items-center justify-between border-b border-slate-100 px-6 py-6 transition last:border-b-0 hover:bg-red-50"
+                            >
 
-                            <p className="mt-1 text-sm text-slate-500">
-                              {email}
-                            </p>
+                              {/* Candidate Information */}
 
-                            <p className="mt-1 text-sm text-slate-500">
-                              {location}
-                            </p>
+                              <div className="min-w-0">
 
-                          </div>
+                                <h3 className="text-lg font-semibold text-slate-900">
+                                  {name}
+                                </h3>
 
-                          {/* Candidate Meta */}
+                                <p className="mt-1 text-sm text-slate-500">
+                                  {email}
+                                </p>
 
-                          <div className="ml-6 flex shrink-0 flex-col items-end">
+                                <p className="mt-1 text-sm text-slate-500">
+                                  {location}
+                                </p>
 
-                            <span className="text-lg font-medium text-red-500">
-                              {experience}{" "}
-                              {experience === "N/A"
-                                ? "years"
-                                : "years"}
-                            </span>
+                              </div>
 
-<button
-  type="button"
-  className="mt-1 text-sm text-slate-400 transition hover:text-red-500"
-  onClick={() => {
-    console.log("Selected Candidate:", candidate);
+                              {/* Candidate Meta */}
 
-    const candidateId =
-      candidate?.id ||
-      candidate?.candidate_id ||
-      candidate?.uuid;
+                              <div className="ml-6 flex shrink-0 flex-col items-end">
 
-    if (!candidateId) {
-      console.error("Candidate ID not found:", candidate);
-      return;
-    }
+                                <span className="text-lg font-medium text-red-500">
+                                  {experience} years
+                                </span>
 
-    navigate(`/candidates/${candidateId}`);
-  }}
->
-  View Profile →
-</button>
+                                <button
+                                  type="button"
+                                  disabled={!candidateId}
+                                  className="mt-1 text-sm text-slate-400 transition hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                  onClick={() => {
 
-                          </div>
+                                    if (
+                                      !candidateId
+                                    ) {
+                                      console.error(
+                                        "Candidate ID not found:",
+                                        candidate
+                                      );
+                                      return;
+                                    }
 
-                        </div>
-                      );
-                    })}
+                                    console.log(
+                                      "Selected Candidate:",
+                                      candidate
+                                    );
 
-                  </div>
+                                    navigate(
+                                      `/candidates/${candidateId}`
+                                    );
 
-                )}
+                                  }}
+                                >
+                                  View Profile →
+                                </button>
 
-              </div>
-            )}
+                              </div>
+
+                            </div>
+
+                          );
+                        }
+                      )}
+
+                    </div>
+
+                  )}
+
+                </div>
+
+              )}
 
             {/* ========================================
                 Dashboard Statistics
             ======================================== */}
 
-            {!searchTerm.trim() && (
+            {!submittedSearchTerm.trim() && (
+
               <div className="mx-auto mt-16 grid max-w-[1100px] gap-8 md:grid-cols-2">
 
                 <DashboardCard
@@ -534,20 +571,27 @@ console.log("======================================");
                 />
 
               </div>
+
             )}
 
           </section>
 
-          {/* Footer */}
+          {/* ========================================
+              Footer
+          ======================================== */}
 
           <footer className="border-t border-red-100 bg-white py-8 text-center">
+
             <p className="text-sm text-slate-400">
               © Built by Prince Singh
             </p>
+
           </footer>
 
         </main>
+
       </div>
+
     </div>
   );
 }
@@ -571,6 +615,7 @@ function SidebarItem({
           : "text-slate-700 hover:bg-red-50"
       }`}
     >
+
       <span
         className={`w-6 text-center text-xl ${
           active
@@ -582,6 +627,7 @@ function SidebarItem({
       </span>
 
       <span>{label}</span>
+
     </button>
   );
 }

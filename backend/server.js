@@ -44,6 +44,7 @@ const authRoutes = require("./routes/authRoutes");
 app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
+app.use("/api/candidates/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/candidates", candidateRoutes);
 
@@ -92,7 +93,6 @@ app.use(
   "/api/resume-authenticity",
   resumeAuthenticityRoutes
 );
-app.use("/api/auth", authRoutes);
 app.get("/", (req, res) => {
   res.send("TalentSphere Backend is Running 🚀");
 });
@@ -117,6 +117,16 @@ app.use((err, req, res, next) => {
     field: err.field,
   });
 });
-app.listen(PORT, () => {
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log("SERVER LISTENING:", server.listening);
+  console.log("SERVER ADDRESS:", server.address());
+});
+
+server.on("close", () => {
+  console.log("🚨 HTTP SERVER CLOSED");
+});
+
+server.on("error", (err) => {
+  console.error("🚨 HTTP SERVER ERROR:", err);
 });

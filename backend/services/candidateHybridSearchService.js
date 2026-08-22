@@ -15,6 +15,39 @@ const {
 console.log("✅ candidateHybridSearchService.js loaded");
 
 // ======================================================
+// Relevance Thresholds
+// ======================================================
+
+// Semantic similarity required for a candidate that has
+// no keyword match at all.
+const MIN_SEMANTIC_SCORE = 0.60;
+
+// If a multi-word query has only a PARTIAL keyword match,
+// require a much stronger semantic match.
+//
+// Example:
+// "Product Manager"
+// candidate matches only "Manager"
+// semantic score must be >= 0.68
+//
+// This prevents Storage/SAN Managers from being returned
+// merely because the word "Manager" exists in their resume.
+const MIN_PARTIAL_KEYWORD_SEMANTIC_SCORE = 0.68;
+
+// ======================================================
+// Normalize Search Terms
+// ======================================================
+
+const getSearchTerms = (query) => {
+  return query
+    .toLowerCase()
+    .replace(/[^\w\s+#.-]/g, " ")
+    .split(/\s+/)
+    .map((term) => term.trim())
+    .filter(Boolean);
+};
+
+// ======================================================
 // Hybrid Candidate Search
 // ======================================================
 
@@ -35,12 +68,22 @@ const searchCandidatesHybrid = async ({
 
   const searchQuery = query.trim();
 
+  const searchTerms =
+    getSearchTerms(searchQuery);
+
+  const totalSearchTerms =
+    searchTerms.length;
+
   console.log("======================================");
   console.log("HYBRID CANDIDATE SEARCH");
   console.log("======================================");
   console.log("Query:", searchQuery);
+  console.log("Search terms:", searchTerms);
   console.log("Location:", location || "Any");
-  console.log("Experience:", experience ?? "Any");
+  console.log(
+    "Experience:",
+    experience ?? "Any"
+  );
   console.log("Limit:", limit);
   console.log("======================================");
 
@@ -48,14 +91,17 @@ const searchCandidatesHybrid = async ({
   // STEP 1: Keyword Search
   // ====================================================
 
-  console.log("STEP 1: Running keyword search...");
+  console.log(
+    "STEP 1: Running keyword search..."
+  );
 
-  const keywordCandidates = await searchCandidates({
-    keyword: searchQuery,
-    location,
-    experience,
-    includeKeywordMetadata: true,
-  });
+  const keywordCandidates =
+    await searchCandidates({
+      keyword: searchQuery,
+      location,
+      experience,
+      includeKeywordMetadata: true,
+    });
 
   console.log(
     "Keyword candidates:",
@@ -114,7 +160,10 @@ const searchCandidatesHybrid = async ({
   // 4A. Add Semantic Candidates
   // ====================================================
 
-  for (const candidate of semanticCandidates || []) {
+  for (
+    const candidate of
+    semanticCandidates || []
+  ) {
 
     if (!candidate?.candidate_id) {
       continue;
@@ -123,7 +172,8 @@ const searchCandidatesHybrid = async ({
     candidateMap.set(
       candidate.candidate_id,
       {
-        candidate_id: candidate.candidate_id,
+        candidate_id:
+          candidate.candidate_id,
 
         full_name:
           candidate.full_name || null,
@@ -148,9 +198,13 @@ const searchCandidatesHybrid = async ({
   // 4B. Add Keyword Candidates
   // ====================================================
 
-  for (const candidate of keywordCandidates || []) {
+  for (
+    const candidate of
+    keywordCandidates || []
+  ) {
 
-    const candidateId = candidate?.id;
+    const candidateId =
+      candidate?.id;
 
     if (!candidateId) {
       continue;
@@ -163,21 +217,35 @@ const searchCandidatesHybrid = async ({
     const keywordMetadata =
       candidate.keyword_metadata;
 
+    const totalMatchedTerms =
+      Number(
+        keywordMetadata?.matched_term_count
+      ) || 0;
+
+    const metadataTotalTerms =
+      Number(
+        keywordMetadata?.total_terms
+      ) || 0;
+
+    const effectiveTotalTerms =
+      metadataTotalTerms > 0
+        ? metadataTotalTerms
+        : totalSearchTerms;
+
     const keywordScore =
-      keywordMetadata &&
-      Number(keywordMetadata.total_terms) > 0
-        ? Number(
-            keywordMetadata.matched_term_count
-          ) /
-          Number(
-            keywordMetadata.total_terms
-          )
+      effectiveTotalTerms > 0
+        ? totalMatchedTerms /
+          effectiveTotalTerms
         : 0;
 
     console.log(
       "Keyword score:",
       candidate.full_name,
-      keywordScore
+      keywordScore,
+      "matched:",
+      totalMatchedTerms,
+      "of:",
+      effectiveTotalTerms
     );
 
     // --------------------------------------------------
@@ -211,13 +279,16 @@ const searchCandidatesHybrid = async ({
       candidateMap.set(
         candidateId,
         {
-          candidate_id: candidateId,
+          candidate_id:
+            candidateId,
 
           full_name:
-            candidate.full_name || null,
+            candidate.full_name ||
+            null,
 
           email:
-            candidate.email || null,
+            candidate.email ||
+            null,
 
           content: null,
 
@@ -247,16 +318,21 @@ const searchCandidatesHybrid = async ({
   );
 
   console.table(
-    Array.from(candidateMap.values()).map(
-      (candidate) => ({
-        id: candidate.candidate_id,
-        name: candidate.full_name,
-        semantic_score:
-          candidate.semantic_score,
-        keyword_score:
-          candidate.keyword_score,
-      })
-    )
+    Array.from(
+      candidateMap.values()
+    ).map((candidate) => ({
+      id:
+        candidate.candidate_id,
+
+      name:
+        candidate.full_name,
+
+      semantic_score:
+        candidate.semantic_score,
+
+      keyword_score:
+        candidate.keyword_score,
+    }))
   );
 
   console.log(
@@ -274,7 +350,8 @@ const searchCandidatesHybrid = async ({
   const candidateIds =
     Array.from(candidateMap.keys());
 
-  let candidateDetailsMap = new Map();
+  let candidateDetailsMap =
+    new Map();
 
   if (candidateIds.length > 0) {
 
@@ -309,7 +386,7 @@ const searchCandidatesHybrid = async ({
   );
 
   // ====================================================
-  // STEP 5: Calculate Hybrid Score
+  // STEP 5: Calculate Hybrid Scores
   // ====================================================
 
   console.log(
@@ -317,129 +394,286 @@ const searchCandidatesHybrid = async ({
   );
 
   const results =
-    Array.from(candidateMap.values())
-      .map((candidate) => {
+    Array.from(
+      candidateMap.values()
+    ).map((candidate) => {
 
-        const semanticScore =
+      const semanticScore =
+        Number(
+          candidate.semantic_score
+        ) || 0;
+
+      const keywordScore =
+        Number(
+          candidate.keyword_score
+        ) || 0;
+
+      const candidateDetails =
+        candidateDetailsMap.get(
+          candidate.candidate_id
+        );
+
+      // ------------------------------------------------
+      // Hybrid Scoring
+      //
+      // Semantic = 70%
+      // Keyword  = 30%
+      // ------------------------------------------------
+
+      const hybridScore =
+        (semanticScore * 0.70) +
+        (keywordScore * 0.30);
+
+      return {
+
+        // ------------------------------------------------
+        // Complete candidate record at TOP LEVEL
+        // ------------------------------------------------
+
+        ...(candidateDetails || {}),
+
+        // ------------------------------------------------
+        // Stable Candidate ID
+        // ------------------------------------------------
+
+        candidate_id:
+          candidate.candidate_id,
+
+        // ------------------------------------------------
+        // Ensure basic fields exist
+        // ------------------------------------------------
+
+        full_name:
+          candidateDetails?.full_name ||
+          candidate.full_name ||
+          null,
+
+        email:
+          candidateDetails?.email ||
+          candidate.email ||
+          null,
+
+        // ------------------------------------------------
+        // Search Scores
+        // ------------------------------------------------
+
+        semantic_score:
           Number(
-            candidate.semantic_score
-          ) || 0;
+            semanticScore.toFixed(4)
+          ),
 
-        const keywordScore =
+        keyword_score:
           Number(
-            candidate.keyword_score
-          ) || 0;
+            keywordScore.toFixed(4)
+          ),
 
-        const candidateDetails =
-          candidateDetailsMap.get(
-            candidate.candidate_id
-          );
-
-        // ------------------------------------------------
-        // Hybrid Scoring
-        //
-        // Semantic = 70%
-        // Keyword  = 30%
-        // ------------------------------------------------
-
-        const hybridScore =
-          (semanticScore * 0.70) +
-          (keywordScore * 0.30);
+        hybrid_score:
+          Number(
+            hybridScore.toFixed(4)
+          ),
 
         // ------------------------------------------------
-        // IMPORTANT
-        //
-        // Spread candidateDetails into the TOP LEVEL.
-        //
-        // This allows the frontend to use:
-        //
-        // candidate.experience
-        // candidate.location
-        // candidate.full_name
-        // candidate.email
-        //
-        // instead of:
-        //
-        // candidate.candidate.experience
+        // Keyword Metadata
         // ------------------------------------------------
 
-        return {
+        keyword_metadata:
+          candidate
+            .keyword_candidate
+            ?.keyword_metadata ||
+          null,
 
-          ...(candidateDetails || {}),
+        // ------------------------------------------------
+        // Embedding Content
+        // ------------------------------------------------
 
-          // ------------------------------------------------
-          // Stable Candidate ID
-          // ------------------------------------------------
+        embedding_content:
+          candidate.content ||
+          null,
+      };
+    });
 
-          candidate_id:
-            candidate.candidate_id,
+  // ====================================================
+  // STEP 5.5: Apply Relevance Gate
+  // ====================================================
 
-          // ------------------------------------------------
-          // Ensure basic fields exist
-          // ------------------------------------------------
+  console.log(
+    "STEP 5.5: Applying relevance gate..."
+  );
 
-          full_name:
-            candidateDetails?.full_name ||
-            candidate.full_name ||
-            null,
+  const relevantResults =
+    results.filter((candidate) => {
 
-          email:
-            candidateDetails?.email ||
-            candidate.email ||
-            null,
+      const semanticScore =
+        Number(
+          candidate.semantic_score
+        ) || 0;
 
-          // ------------------------------------------------
-          // Search Scores
-          // ------------------------------------------------
+      const keywordScore =
+        Number(
+          candidate.keyword_score
+        ) || 0;
 
-          semantic_score:
-            Number(
-              semanticScore.toFixed(4)
-            ),
+      // =================================================
+      // RULE 1
+      //
+      // Single-term keyword search
+      //
+      // Example:
+      // "AWS"
+      //
+      // A complete keyword match is strong evidence.
+      // =================================================
 
-          keyword_score:
-            Number(
-              keywordScore.toFixed(4)
-            ),
+      if (
+        totalSearchTerms === 1 &&
+        keywordScore >= 1
+      ) {
 
-          hybrid_score:
-            Number(
-              hybridScore.toFixed(4)
-            ),
+        console.log(
+          "✅ ACCEPT - Exact single-term keyword match:",
+          candidate.full_name
+        );
 
-          // ------------------------------------------------
-          // Keyword Metadata
-          // ------------------------------------------------
+        return true;
+      }
 
-          keyword_metadata:
-            candidate.keyword_candidate
-              ?.keyword_metadata || null,
+      // =================================================
+      // RULE 2
+      //
+      // Multi-term query with COMPLETE keyword match
+      //
+      // Example:
+      // "Java Developer"
+      //
+      // Both terms matched.
+      // =================================================
 
-          // ------------------------------------------------
-          // Embedding Content
-          // ------------------------------------------------
+      if (
+        totalSearchTerms > 1 &&
+        keywordScore >= 1
+      ) {
 
-          embedding_content:
-            candidate.content || null,
-        };
-      });
+        console.log(
+          "✅ ACCEPT - Complete keyword match:",
+          candidate.full_name
+        );
+
+        return true;
+      }
+
+      // =================================================
+      // RULE 3
+      //
+      // Semantic-only candidate
+      //
+      // No keyword match at all.
+      //
+      // This preserves legitimate semantic search.
+      // =================================================
+
+      if (
+        keywordScore === 0 &&
+        semanticScore >=
+          MIN_SEMANTIC_SCORE
+      ) {
+
+        console.log(
+          "✅ ACCEPT - Strong semantic match:",
+          candidate.full_name,
+          "semantic:",
+          semanticScore
+        );
+
+        return true;
+      }
+
+      // =================================================
+      // RULE 4
+      //
+      // Partial keyword match.
+      //
+      // Example:
+      //
+      // Query:
+      // "Product Manager"
+      //
+      // Candidate:
+      // Storage/SAN Manager
+      //
+      // keyword_score = 0.5
+      //
+      // We do NOT accept this merely because
+      // "Manager" matched.
+      //
+      // It needs an exceptionally strong semantic
+      // relationship to the complete query.
+      // =================================================
+
+      if (
+        keywordScore > 0 &&
+        keywordScore < 1 &&
+        semanticScore >=
+          MIN_PARTIAL_KEYWORD_SEMANTIC_SCORE
+      ) {
+
+        console.log(
+          "✅ ACCEPT - Partial keyword + strong semantic match:",
+          candidate.full_name,
+          "semantic:",
+          semanticScore,
+          "keyword:",
+          keywordScore
+        );
+
+        return true;
+      }
+
+      // =================================================
+      // RULE 5
+      //
+      // Reject weak candidates.
+      // =================================================
+
+      console.log(
+        "❌ REJECT:",
+        candidate.full_name,
+        "| semantic:",
+        semanticScore,
+        "| keyword:",
+        keywordScore,
+        "| hybrid:",
+        candidate.hybrid_score
+      );
+
+      return false;
+    });
+
+  console.log(
+    "Candidates before relevance gate:",
+    results.length
+  );
+
+  console.log(
+    "Candidates after relevance gate:",
+    relevantResults.length
+  );
 
   // ====================================================
   // STEP 6: Sort By Hybrid Score
   // ====================================================
 
   console.log(
-    "STEP 6: Sorting by hybrid score..."
+    "STEP 6: Sorting relevant candidates..."
   );
 
-  results.sort(
+  relevantResults.sort(
     (a, b) =>
       b.hybrid_score -
       a.hybrid_score
   );
 
   // ====================================================
-  // Hybrid Score Debug
+  // HYBRID SCORE DEBUG
   // ====================================================
 
   console.log(
@@ -447,26 +681,28 @@ const searchCandidatesHybrid = async ({
   );
 
   console.table(
-    results.map((candidate) => ({
-      id:
-        candidate.id ||
-        candidate.candidate_id,
+    relevantResults.map(
+      (candidate) => ({
+        id:
+          candidate.id ||
+          candidate.candidate_id,
 
-      name:
-        candidate.full_name,
+        name:
+          candidate.full_name,
 
-      experience:
-        candidate.experience,
+        experience:
+          candidate.experience,
 
-      semantic:
-        candidate.semantic_score,
+        semantic:
+          candidate.semantic_score,
 
-      keyword:
-        candidate.keyword_score,
+        keyword:
+          candidate.keyword_score,
 
-      hybrid:
-        candidate.hybrid_score,
-    }))
+        hybrid:
+          candidate.hybrid_score,
+      })
+    )
   );
 
   console.log(
@@ -478,7 +714,10 @@ const searchCandidatesHybrid = async ({
   // ====================================================
 
   const finalResults =
-    results.slice(0, limit);
+    relevantResults.slice(
+      0,
+      limit
+    );
 
   console.log(
     "======================================"
@@ -486,6 +725,11 @@ const searchCandidatesHybrid = async ({
 
   console.log(
     "FINAL HYBRID SEARCH RESULTS"
+  );
+
+  console.log(
+    "Count:",
+    finalResults.length
   );
 
   console.log(
