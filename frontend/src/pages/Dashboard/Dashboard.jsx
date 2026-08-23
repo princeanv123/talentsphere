@@ -193,25 +193,29 @@ export default function Dashboard() {
   };
 
   const handleNavigation = (label) => {
-    closeMobileMenu();
+  closeMobileMenu();
 
-    switch (label) {
-      case "Dashboard":
-        navigate("/dashboard");
-        break;
+  switch (label) {
+    case "Dashboard":
+      navigate("/dashboard");
+      break;
 
-      case "Candidates":
-        navigate("/candidates");
-        break;
+    case "Candidates":
+      navigate("/candidates");
+      break;
 
-      default:
-        /*
-         * These pages are not connected yet.
-         */
-        console.log(`${label} navigation clicked`);
-        break;
-    }
-  };
+    case "Resume Vault":
+      navigate("/resume-vault");
+      break;
+
+    default:
+      /*
+       * These pages are not connected yet.
+       */
+      console.log(`${label} navigation clicked`);
+      break;
+  }
+};
 
   // Close mobile menu with Escape
   useEffect(() => {
