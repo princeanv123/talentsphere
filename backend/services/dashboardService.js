@@ -1,26 +1,150 @@
 const supabase = require("../config/supabase");
 
+// ======================================================
+// Dashboard Statistics
+// ======================================================
+
 const getDashboardStats = async () => {
-  // Total Candidates
-  const { count: totalCandidates, error: candidateError } = await supabase
+
+  // ====================================================
+  // Date: Start of current month
+  // ====================================================
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const startOfMonthISO = startOfMonth.toISOString();
+
+
+  // ====================================================
+  // 1. TOTAL CANDIDATES
+  // ====================================================
+
+  const {
+    count: totalCandidates,
+    error: candidateError,
+  } = await supabase
     .from("candidates")
-    .select("*", { count: "exact", head: true });
+    .select("*", {
+      count: "exact",
+      head: true,
+    });
 
   if (candidateError) {
     throw new Error(candidateError.message);
   }
 
-  // Total Resumes
-  const { count: totalResumes, error: resumeError } = await supabase
-    .from("resumes")
-    .select("*", { count: "exact", head: true });
 
-  if (resumeError) {
-    throw new Error(resumeError.message);
+  // ====================================================
+  // 2. NEW CANDIDATES THIS MONTH
+  // ====================================================
+
+  const {
+    count: newCandidatesThisMonth,
+    error: newCandidateError,
+  } = await supabase
+    .from("candidates")
+    .select("*", {
+      count: "exact",
+      head: true,
+    })
+    .gte("created_at", startOfMonthISO);
+
+  if (newCandidateError) {
+    throw new Error(newCandidateError.message);
   }
 
-  // Candidate Experience
-  const { data: experienceData, error: experienceError } = await supabase
+
+  // ====================================================
+  // 3. ACTIVE JOBS
+  // Actual status value in database = "Open"
+  // ====================================================
+
+  const {
+    count: activeJobs,
+    error: jobError,
+  } = await supabase
+    .from("jobs")
+    .select("*", {
+      count: "exact",
+      head: true,
+    })
+    .eq("status", "Open");
+
+  if (jobError) {
+    throw new Error(jobError.message);
+  }
+
+
+  // ====================================================
+  // 4. NEW JOBS THIS MONTH
+  // ====================================================
+
+  const {
+    count: newJobsThisMonth,
+    error: newJobError,
+  } = await supabase
+    .from("jobs")
+    .select("*", {
+      count: "exact",
+      head: true,
+    })
+    .gte("created_at", startOfMonthISO);
+
+  if (newJobError) {
+    throw new Error(newJobError.message);
+  }
+
+
+  // ====================================================
+  // 5. TOTAL AI MATCHES
+  // candidate_matches contains every saved match analysis
+  // ====================================================
+
+  const {
+    count: aiMatches,
+    error: matchError,
+  } = await supabase
+    .from("candidate_matches")
+    .select("*", {
+      count: "exact",
+      head: true,
+    });
+
+  if (matchError) {
+    throw new Error(matchError.message);
+  }
+
+
+  // ====================================================
+  // 6. AI MATCHES THIS MONTH
+  // ====================================================
+
+  const {
+    count: aiMatchesThisMonth,
+    error: monthlyMatchError,
+  } = await supabase
+    .from("candidate_matches")
+    .select("*", {
+      count: "exact",
+      head: true,
+    })
+    .gte("created_at", startOfMonthISO);
+
+  if (monthlyMatchError) {
+    throw new Error(monthlyMatchError.message);
+  }
+
+
+  // ====================================================
+  // 7. CANDIDATE EXPERIENCE
+  // ====================================================
+
+  const {
+    data: experienceData,
+    error: experienceError,
+  } = await supabase
     .from("candidates")
     .select("experience");
 
@@ -29,65 +153,105 @@ const getDashboardStats = async () => {
   }
 
   const totalExperience = experienceData.reduce(
-    (sum, candidate) => sum + (candidate.experience || 0),
+    (sum, candidate) => {
+      const experience = Number(candidate.experience) || 0;
+      return sum + experience;
+    },
     0
   );
 
   const averageExperience =
     experienceData.length > 0
-      ? Number((totalExperience / experienceData.length).toFixed(1))
+      ? Number(
+          (
+            totalExperience /
+            experienceData.length
+          ).toFixed(1)
+        )
       : 0;
 
-  // New Candidates This Month
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
 
-  const { count: newCandidatesThisMonth, error: monthError } = await supabase
-    .from("candidates")
-    .select("*", { count: "exact", head: true })
-    .gte("created_at", startOfMonth.toISOString());
+  // ====================================================
+  // 8. TOP SKILLS
+  // ====================================================
 
-  if (monthError) {
-    throw new Error(monthError.message);
-  }
-
-  // Top Skills
- const { data: skillsData, error: skillsError } = await supabase
-  .from("candidate_skills")
-  .select(`
-    skills (
-      skill_name
-    )
-  `);
+  const {
+    data: skillsData,
+    error: skillsError,
+  } = await supabase
+    .from("candidate_skills")
+    .select(`
+      skills (
+        skill_name
+      )
+    `);
 
   if (skillsError) {
     throw new Error(skillsError.message);
   }
 
-const skillMap = {};
+  const skillMap = {};
 
-skillsData.forEach((item) => {
-  const skillName = item.skills?.skill_name;
+  skillsData.forEach((item) => {
 
-  if (!skillName) return;
+    const skillName =
+      item.skills?.skill_name;
 
-  skillMap[skillName] = (skillMap[skillName] || 0) + 1;
-});
+    if (!skillName) {
+      return;
+    }
+
+    skillMap[skillName] =
+      (skillMap[skillName] || 0) + 1;
+  });
 
   const topSkills = Object.entries(skillMap)
-    .map(([skill, count]) => ({ skill, count }))
+    .map(([skill, count]) => ({
+      skill,
+      count,
+    }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
+
+  // ====================================================
+  // RETURN
+  // ====================================================
+
   return {
-    totalCandidates,
-    totalResumes,
+
+    // Candidates
+    totalCandidates:
+      totalCandidates || 0,
+
+    newCandidatesThisMonth:
+      newCandidatesThisMonth || 0,
+
+    // Jobs
+    activeJobs:
+      activeJobs || 0,
+
+    newJobsThisMonth:
+      newJobsThisMonth || 0,
+
+    // AI Matching
+    aiMatches:
+      aiMatches || 0,
+
+    aiMatchesThisMonth:
+      aiMatchesThisMonth || 0,
+
+    // Existing dashboard information
     averageExperience,
-    newCandidatesThisMonth,
+
     topSkills,
   };
 };
+
+
+// ======================================================
+// Export
+// ======================================================
 
 module.exports = {
   getDashboardStats,

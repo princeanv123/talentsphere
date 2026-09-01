@@ -13,7 +13,7 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const jobRoutes = require("./routes/jobRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
 const matchingRoutes = require("./routes/matchingRoutes");
-
+const healthRoutes = require("./routes/healthRoutes");
 const skillConsistencyRoutes = require(
   "./routes/skillConsistencyRoutes"
 );
@@ -45,6 +45,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/candidates/auth", authRoutes);
+app.use("/api/health", healthRoutes);
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/candidates", candidateRoutes);
 
@@ -93,6 +94,7 @@ app.use(
   "/api/resume-authenticity",
   resumeAuthenticityRoutes
 );
+
 app.get("/", (req, res) => {
   res.send("TalentSphere Backend is Running 🚀");
 });

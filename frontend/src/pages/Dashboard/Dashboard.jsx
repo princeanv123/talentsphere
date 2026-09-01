@@ -1,17 +1,27 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Bell,
+  Bot,
   BrainCircuit,
   Briefcase,
+  CheckCircle2,
   ChevronRight,
+  Clock3,
+  Database,
   FileText,
   Filter,
+  HeartPulse,
   LayoutDashboard,
+  LoaderCircle,
   Menu,
+  RefreshCw,
   Search,
+  Server,
   Settings,
   Sparkles,
   Users,
@@ -20,11 +30,26 @@ import {
 
 import { searchCandidates } from "../../services/candidateService";
 
+// ============================================================
+// API CONFIGURATION
+// ============================================================
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000"
+)
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "");
+
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
   // =========================================================
-  // STATE
+  // SEARCH STATE
   // =========================================================
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -33,8 +58,197 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
 
-  // Mobile sidebar
+  // =========================================================
+  // DASHBOARD LIVE DATA
+  // =========================================================
+
+  const [dashboardData, setDashboardData] = useState(null);
+  const [healthData, setHealthData] = useState(null);
+
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [healthLoading, setHealthLoading] = useState(true);
+
+  const [dashboardError, setDashboardError] = useState("");
+  const [healthError, setHealthError] = useState("");
+
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  // =========================================================
+  // MOBILE SIDEBAR
+  // =========================================================
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+
+  // =========================================================
+  // LOAD DASHBOARD DATA
+  // =========================================================
+
+  const loadDashboardData = async () => {
+    try {
+      setDashboardError("");
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/dashboard`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Dashboard API returned ${response.status}`
+        );
+      }
+
+      const result = await response.json();
+
+      if (!result?.success) {
+        throw new Error(
+          result?.message || "Unable to load dashboard data."
+        );
+      }
+
+      setDashboardData(result.data || {});
+    } catch (error) {
+      console.error("Dashboard data error:", error);
+
+      setDashboardError(
+        error?.message ||
+          "Unable to load dashboard data."
+      );
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
+
+  // =========================================================
+  // LOAD SYSTEM HEALTH
+  // =========================================================
+
+  const loadSystemHealth = async () => {
+    try {
+      setHealthError("");
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/health`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      /*
+       * /api/health intentionally returns 503 when the
+       * system is degraded. That is NOT a network error.
+       *
+       * We still read the JSON response and display the
+       * actual component-level health information.
+       */
+
+      const result = await response.json();
+
+      if (!result) {
+        throw new Error(
+          "Empty response from health API."
+        );
+      }
+
+      setHealthData(result);
+    } catch (error) {
+      console.error("System health error:", error);
+
+      setHealthError(
+        error?.message ||
+          "Unable to retrieve system health."
+      );
+
+      /*
+       * If the health endpoint itself cannot be reached,
+       * represent that clearly in the UI.
+       */
+
+      setHealthData({
+        success: false,
+        status: "failed",
+        message:
+          "System health service is unreachable.",
+        components: {
+          backend: {
+            name: "Backend API",
+            status: "failed",
+            message:
+              "Health endpoint could not be reached.",
+          },
+          supabase: {
+            name: "Supabase",
+            status: "unknown",
+            message:
+              "Unable to determine database status.",
+          },
+          gemini: {
+            name: "Gemini AI",
+            status: "unknown",
+            message:
+              "Unable to determine AI service status.",
+          },
+        },
+        failedComponents: ["Backend API"],
+      });
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
+
+  // =========================================================
+  // REFRESH EVERYTHING
+  // =========================================================
+
+  const refreshDashboard = async () => {
+    try {
+      setRefreshing(true);
+
+      await Promise.all([
+        loadDashboardData(),
+        loadSystemHealth(),
+      ]);
+
+      setLastUpdated(new Date());
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+
+  // =========================================================
+  // INITIAL LOAD + AUTO REFRESH
+  // =========================================================
+
+  useEffect(() => {
+    refreshDashboard();
+
+    /*
+     * Refresh live dashboard information every 30 seconds.
+     */
+
+    const interval = setInterval(() => {
+      refreshDashboard();
+    }, 30000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
 
   // =========================================================
   // SEARCH
@@ -64,30 +278,41 @@ export default function Dashboard() {
           keyword,
         });
 
-        console.log("Candidate Search Results:", results);
+        console.log(
+          "Candidate Search Results:",
+          results
+        );
 
         /*
          * candidateService normally returns result.data.
          *
-         * This defensive handling also supports the case
+         * Defensive handling also supports the case
          * where the service returns the complete API response.
          */
+
         const candidates = Array.isArray(results)
           ? results
           : Array.isArray(results?.data)
             ? results.data
             : [];
 
-        console.log("Candidates to render:", candidates);
+        console.log(
+          "Candidates to render:",
+          candidates
+        );
 
         setSearchResults(candidates);
       } catch (error) {
-        console.error("Candidate search error:", error);
+        console.error(
+          "Candidate search error:",
+          error
+        );
 
         setSearchResults([]);
 
         setSearchError(
-          error?.message || "Unable to search candidates"
+          error?.message ||
+            "Unable to search candidates"
         );
       } finally {
         setLoading(false);
@@ -96,6 +321,7 @@ export default function Dashboard() {
 
     runSearch();
   }, [submittedSearchTerm]);
+
 
   // =========================================================
   // SEARCH HANDLERS
@@ -114,12 +340,14 @@ export default function Dashboard() {
     setSubmittedSearchTerm(keyword);
   };
 
+
   const handleSearchKeyDown = (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
       handleSearch();
     }
   };
+
 
   // =========================================================
   // CANDIDATE HELPERS
@@ -134,9 +362,14 @@ export default function Dashboard() {
     );
   };
 
+
   const getCandidateEmail = (candidate) => {
-    return candidate?.email || "Email not available";
+    return (
+      candidate?.email ||
+      "Email not available"
+    );
   };
+
 
   const getCandidateLocation = (candidate) => {
     return (
@@ -146,13 +379,8 @@ export default function Dashboard() {
     );
   };
 
+
   const getCandidateExperience = (candidate) => {
-    /*
-     * Current backend returns candidate fields at the top level.
-     *
-     * The nested candidate fallback is retained for compatibility
-     * with older search responses.
-     */
     const experience =
       candidate?.experience ??
       candidate?.total_experience ??
@@ -174,7 +402,11 @@ export default function Dashboard() {
     return "N/A";
   };
 
-  const getCandidateKey = (candidate, index) => {
+
+  const getCandidateKey = (
+    candidate,
+    index
+  ) => {
     return (
       candidate?.id ||
       candidate?.candidate_id ||
@@ -184,6 +416,7 @@ export default function Dashboard() {
     );
   };
 
+
   // =========================================================
   // MOBILE MENU
   // =========================================================
@@ -192,32 +425,40 @@ export default function Dashboard() {
     setMobileMenuOpen(false);
   };
 
+
   const handleNavigation = (label) => {
-  closeMobileMenu();
+    closeMobileMenu();
 
-  switch (label) {
-    case "Dashboard":
-      navigate("/dashboard");
-      break;
+    switch (label) {
+      case "Dashboard":
+        navigate("/dashboard");
+        break;
 
-    case "Candidates":
-      navigate("/candidates");
-      break;
+      case "Candidates":
+        navigate("/candidates");
+        break;
 
-    case "Resume Vault":
-      navigate("/resume-vault");
-      break;
+      case "Jobs":
+        navigate("/jobs");
+        break;
 
-    default:
-      /*
-       * These pages are not connected yet.
-       */
-      console.log(`${label} navigation clicked`);
-      break;
-  }
-};
+      case "Resume Vault":
+        navigate("/resume-vault");
+        break;
 
-  // Close mobile menu with Escape
+      default:
+        console.log(
+          `${label} navigation clicked`
+        );
+        break;
+    }
+  };
+
+
+  // =========================================================
+  // CLOSE MOBILE MENU WITH ESCAPE
+  // =========================================================
+
   useEffect(() => {
     const handleEscape = (event) => {
       if (event.key === "Escape") {
@@ -225,12 +466,36 @@ export default function Dashboard() {
       }
     };
 
-    window.addEventListener("keydown", handleEscape);
+    window.addEventListener(
+      "keydown",
+      handleEscape
+    );
 
     return () => {
-      window.removeEventListener("keydown", handleEscape);
+      window.removeEventListener(
+        "keydown",
+        handleEscape
+      );
     };
   }, []);
+
+
+  // =========================================================
+  // LIVE DASHBOARD VALUES
+  // =========================================================
+
+  const totalCandidates =
+    dashboardData?.totalCandidates ??
+    0;
+
+  const activeJobs =
+    dashboardData?.activeJobs ??
+    0;
+
+  const aiMatches =
+    dashboardData?.aiMatches ??
+    0;
+
 
   // =========================================================
   // RENDER
@@ -254,6 +519,7 @@ export default function Dashboard() {
 
         </aside>
 
+
         {/* ===================================================
             MOBILE SIDEBAR OVERLAY
         =================================================== */}
@@ -265,6 +531,7 @@ export default function Dashboard() {
             aria-hidden="true"
           />
         )}
+
 
         {/* ===================================================
             MOBILE SIDEBAR
@@ -310,6 +577,7 @@ export default function Dashboard() {
 
         </aside>
 
+
         {/* ===================================================
             MAIN CONTENT
         =================================================== */}
@@ -326,17 +594,23 @@ export default function Dashboard() {
 
             <button
               type="button"
-              onClick={() => setMobileMenuOpen(true)}
+              onClick={() =>
+                setMobileMenuOpen(true)
+              }
               className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-slate-700 transition hover:bg-red-100 hover:text-red-500 lg:hidden"
               aria-label="Open menu"
-              aria-expanded={mobileMenuOpen}
+              aria-expanded={
+                mobileMenuOpen
+              }
             >
               <Menu size={25} />
             </button>
 
+
             {/* Desktop Spacer */}
 
             <div className="hidden lg:block" />
+
 
             {/* Header Actions */}
 
@@ -364,6 +638,7 @@ export default function Dashboard() {
 
           </header>
 
+
           {/* =================================================
               DASHBOARD CONTENT
           ================================================= */}
@@ -384,6 +659,7 @@ export default function Dashboard() {
 
             </div>
 
+
             {/* =================================================
                 SEARCH
             ================================================= */}
@@ -403,9 +679,13 @@ export default function Dashboard() {
                     type="text"
                     value={searchTerm}
                     onChange={(event) =>
-                      setSearchTerm(event.target.value)
+                      setSearchTerm(
+                        event.target.value
+                      )
                     }
-                    onKeyDown={handleSearchKeyDown}
+                    onKeyDown={
+                      handleSearchKeyDown
+                    }
                     placeholder="Search candidates, jobs or skills..."
                     className="w-full min-w-0 bg-transparent py-2 text-base text-slate-700 outline-none placeholder:text-slate-400 sm:text-lg"
                   />
@@ -418,10 +698,13 @@ export default function Dashboard() {
                   disabled={loading}
                   className="w-full rounded-xl bg-red-500 px-7 py-3 font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  {loading ? "Searching..." : "Search"}
+                  {loading
+                    ? "Searching..."
+                    : "Search"}
                 </button>
 
               </div>
+
 
               {/* Search Status */}
 
@@ -430,6 +713,7 @@ export default function Dashboard() {
                   Searching candidates...
                 </p>
               )}
+
 
               {!loading &&
                 submittedSearchTerm.trim() &&
@@ -440,6 +724,7 @@ export default function Dashboard() {
                   </p>
                 )}
 
+
               {searchError && (
                 <p className="mt-5 text-center text-red-500">
                   {searchError}
@@ -447,6 +732,7 @@ export default function Dashboard() {
               )}
 
             </div>
+
 
             {/* =================================================
                 CANDIDATE SEARCH RESULTS
@@ -473,19 +759,30 @@ export default function Dashboard() {
                     <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm">
 
                       {searchResults.map(
-                        (candidate, index) => {
+                        (
+                          candidate,
+                          index
+                        ) => {
 
                           const name =
-                            getCandidateName(candidate);
+                            getCandidateName(
+                              candidate
+                            );
 
                           const email =
-                            getCandidateEmail(candidate);
+                            getCandidateEmail(
+                              candidate
+                            );
 
                           const location =
-                            getCandidateLocation(candidate);
+                            getCandidateLocation(
+                              candidate
+                            );
 
                           const experience =
-                            getCandidateExperience(candidate);
+                            getCandidateExperience(
+                              candidate
+                            );
 
                           const key =
                             getCandidateKey(
@@ -523,6 +820,7 @@ export default function Dashboard() {
 
                               </div>
 
+
                               {/* Candidate Meta */}
 
                               <div className="flex shrink-0 flex-col items-start sm:ml-6 sm:items-end">
@@ -548,12 +846,12 @@ export default function Dashboard() {
                                     navigate(
                                       `/candidates/${candidateId}`
                                     );
-
                                   }}
                                 >
                                   View Profile
-                                  <ChevronRight size={15} />
-
+                                  <ChevronRight
+                                    size={15}
+                                  />
                                 </button>
 
                               </div>
@@ -572,47 +870,193 @@ export default function Dashboard() {
 
               )}
 
+
             {/* =================================================
-                DASHBOARD STATISTICS
+                LIVE DASHBOARD STATISTICS
             ================================================= */}
 
             {!submittedSearchTerm.trim() && (
 
               <div className="mx-auto mt-14 grid max-w-[1100px] gap-6 md:grid-cols-2 lg:gap-8">
 
+                {/* =================================================
+                    CANDIDATES
+                ================================================= */}
+
                 <DashboardCard
-                  icon={<Users size={25} />}
+                  icon={
+                    <Users size={25} />
+                  }
                   title="Candidates"
-                  value="12,584"
-                  subtitle="+12% this month"
+                  value={
+                    dashboardLoading
+                      ? null
+                      : formatNumber(
+                          totalCandidates
+                        )
+                  }
+                  subtitle={
+                    dashboardLoading
+                      ? "Loading live data..."
+                      : dashboardError
+                        ? "Unable to load live data"
+                        : "Live talent pool"
+                  }
+                  loading={
+                    dashboardLoading
+                  }
                 />
 
+
+                {/* =================================================
+                    ACTIVE JOBS
+                ================================================= */}
+
                 <DashboardCard
-                  icon={<Briefcase size={25} />}
+                  icon={
+                    <Briefcase size={25} />
+                  }
                   title="Active Jobs"
-                  value="247"
-                  subtitle="18 closing soon"
+                  value={
+                    dashboardLoading
+                      ? null
+                      : formatNumber(
+                          activeJobs
+                        )
+                  }
+                  subtitle={
+                    dashboardLoading
+                      ? "Loading live data..."
+                      : dashboardError
+                        ? "Unable to load live data"
+                        : "Currently open positions"
+                  }
+                  loading={
+                    dashboardLoading
+                  }
                 />
 
+
+                {/* =================================================
+                    AI MATCHES
+                ================================================= */}
+
                 <DashboardCard
-                  icon={<BrainCircuit size={25} />}
+                  icon={
+                    <BrainCircuit
+                      size={25}
+                    />
+                  }
                   title="AI Matches"
-                  value="8,421"
-                  subtitle="+18% this month"
+                  value={
+                    dashboardLoading
+                      ? null
+                      : formatNumber(
+                          aiMatches
+                        )
+                  }
+                  subtitle={
+                    dashboardLoading
+                      ? "Loading live data..."
+                      : dashboardError
+                        ? "Unable to load live data"
+                        : "Candidate-job matches generated"
+                  }
+                  loading={
+                    dashboardLoading
+                  }
                 />
 
-                <DashboardCard
-                  icon={<FileText size={25} />}
-                  title="Resumes"
-                  value="18,932"
-                  subtitle="+8% this month"
+
+                {/* =================================================
+                    SYSTEM HEALTH
+                ================================================= */}
+
+                <SystemHealthCard
+                  healthData={healthData}
+                  loading={healthLoading}
+                  error={healthError}
+                  onRefresh={
+                    refreshDashboard
+                  }
+                  refreshing={
+                    refreshing
+                  }
                 />
 
               </div>
 
             )}
 
+
+            {/* =================================================
+                DASHBOARD REFRESH STATUS
+            ================================================= */}
+
+            {!submittedSearchTerm.trim() && (
+
+              <div className="mx-auto mt-6 flex max-w-[1100px] flex-col items-center justify-between gap-3 text-sm text-slate-400 sm:flex-row">
+
+                <div className="flex items-center gap-2">
+
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      healthData?.status ===
+                      "healthy"
+                        ? "bg-green-500"
+                        : healthData?.status ===
+                            "degraded"
+                          ? "bg-amber-500"
+                          : "bg-slate-300"
+                    }`}
+                  />
+
+                  <span>
+                    Live system monitoring
+                    active
+                  </span>
+
+                </div>
+
+
+                <div className="flex items-center gap-3">
+
+                  {lastUpdated && (
+                    <span>
+                      Last updated{" "}
+                      {formatTime(
+                        lastUpdated
+                      )}
+                    </span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={
+                      refreshDashboard
+                    }
+                    disabled={refreshing}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-slate-500 transition hover:bg-white hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      size={15}
+                      className={
+                        refreshing
+                          ? "animate-spin"
+                          : ""
+                      }
+                    />
+                    Refresh
+                  </button>
+
+                </div>
+
+              </div>
+
+            )}
+
           </section>
+
 
           {/* =================================================
               FOOTER
@@ -631,6 +1075,447 @@ export default function Dashboard() {
       </div>
 
     </div>
+  );
+}
+
+
+// ============================================================
+// SYSTEM HEALTH CARD
+// ============================================================
+
+function SystemHealthCard({
+  healthData,
+  loading,
+  error,
+  onRefresh,
+  refreshing,
+}) {
+
+  const status =
+    healthData?.status ||
+    (error ? "failed" : "unknown");
+
+
+  const isHealthy =
+    status === "healthy";
+
+
+  const isDegraded =
+    status === "degraded";
+
+
+  const statusLabel = isHealthy
+    ? "SYSTEM OPERATIONAL"
+    : isDegraded
+      ? "SYSTEM DEGRADED"
+      : "SYSTEM UNAVAILABLE";
+
+
+  const statusDescription = isHealthy
+    ? "All monitored services are operating normally."
+    : isDegraded
+      ? "One or more monitored services need attention."
+      : "Unable to verify all monitored services.";
+
+
+  const statusClasses = isHealthy
+    ? {
+        badge:
+          "bg-green-50 text-green-700 border-green-200",
+        icon:
+          "bg-green-50 text-green-600",
+        dot:
+          "bg-green-500",
+        accent:
+          "text-green-600",
+      }
+    : isDegraded
+      ? {
+          badge:
+            "bg-amber-50 text-amber-700 border-amber-200",
+          icon:
+            "bg-amber-50 text-amber-600",
+          dot:
+            "bg-amber-500",
+          accent:
+            "text-amber-600",
+        }
+      : {
+          badge:
+            "bg-red-50 text-red-700 border-red-200",
+          icon:
+            "bg-red-50 text-red-600",
+          dot:
+            "bg-red-500",
+          accent:
+            "text-red-600",
+        };
+
+
+  const components = [
+    {
+      key: "backend",
+      name: "Backend API",
+      icon: Server,
+      data:
+        healthData?.components
+          ?.backend,
+    },
+    {
+      key: "supabase",
+      name: "Supabase",
+      icon: Database,
+      data:
+        healthData?.components
+          ?.supabase,
+    },
+    {
+      key: "gemini",
+      name: "Gemini AI",
+      icon: Bot,
+      data:
+        healthData?.components
+          ?.gemini,
+    },
+  ];
+
+
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-red-100 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md sm:p-7">
+
+      {/* Decorative background */}
+
+      <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-red-50/70 blur-2xl transition group-hover:bg-red-100/70" />
+
+
+      {/* Header */}
+
+      <div className="relative flex items-start justify-between">
+
+        <div className="flex items-center gap-4">
+
+          <div
+            className={`flex h-14 w-14 items-center justify-center rounded-2xl ${statusClasses.icon}`}
+          >
+            {loading ? (
+              <LoaderCircle
+                size={27}
+                className="animate-spin"
+              />
+            ) : (
+              <HeartPulse
+                size={27}
+              />
+            )}
+          </div>
+
+
+          <div>
+
+            <p className="text-lg font-medium text-slate-500">
+              System Health
+            </p>
+
+            <div className="mt-1 flex items-center gap-2">
+
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${statusClasses.dot} ${
+                  isHealthy
+                    ? "animate-pulse"
+                    : ""
+                }`}
+              />
+
+              <span
+                className={`text-sm font-semibold ${statusClasses.accent}`}
+              >
+                {loading
+                  ? "CHECKING SYSTEM..."
+                  : statusLabel}
+              </span>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+          title="Refresh system health"
+          aria-label="Refresh system health"
+        >
+          <RefreshCw
+            size={19}
+            className={
+              refreshing
+                ? "animate-spin"
+                : ""
+            }
+          />
+        </button>
+
+      </div>
+
+
+      {/* Status message */}
+
+      <div className="relative mt-6">
+
+        <div
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusClasses.badge}`}
+        >
+          {isHealthy ? (
+            <CheckCircle2
+              size={14}
+            />
+          ) : (
+            <AlertTriangle
+              size={14}
+            />
+          )}
+
+          {loading
+            ? "Monitoring services"
+            : statusLabel}
+        </div>
+
+
+        <p className="mt-3 text-sm leading-6 text-slate-500">
+          {loading
+            ? "Checking Backend, Supabase and Gemini AI..."
+            : statusDescription}
+        </p>
+
+      </div>
+
+
+      {/* Components */}
+
+      <div className="relative mt-6 space-y-3">
+
+        {components.map(
+          (component) => {
+
+            const Icon =
+              component.icon;
+
+            const componentStatus =
+              component.data
+                ?.status ||
+              (loading
+                ? "checking"
+                : "unknown");
+
+            const componentHealthy =
+              componentStatus ===
+              "healthy";
+
+            const componentFailed =
+              componentStatus ===
+              "failed";
+
+            return (
+
+              <div
+                key={component.key}
+                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-3"
+              >
+
+                <div className="flex min-w-0 items-center gap-3">
+
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500">
+
+                    <Icon size={17} />
+
+                  </div>
+
+                  <div className="min-w-0">
+
+                    <p className="truncate text-sm font-medium text-slate-700">
+                      {component.name}
+                    </p>
+
+                    {component.data
+                      ?.responseTimeMs !==
+                      undefined && (
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-400">
+                        <Clock3
+                          size={11}
+                        />
+                        {
+                          component.data
+                            .responseTimeMs
+                        }
+                        ms
+                      </p>
+                    )}
+
+                  </div>
+
+                </div>
+
+
+                <div className="flex shrink-0 items-center gap-2">
+
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      componentHealthy
+                        ? "bg-green-500"
+                        : componentFailed
+                          ? "bg-red-500"
+                          : componentStatus ===
+                              "checking"
+                            ? "bg-amber-400 animate-pulse"
+                            : "bg-slate-300"
+                    }`}
+                  />
+
+                  <span
+                    className={`text-xs font-semibold ${
+                      componentHealthy
+                        ? "text-green-600"
+                        : componentFailed
+                          ? "text-red-600"
+                          : "text-slate-400"
+                    }`}
+                  >
+                    {componentHealthy
+                      ? "Healthy"
+                      : componentFailed
+                        ? "Failed"
+                        : componentStatus ===
+                            "checking"
+                          ? "Checking"
+                          : "Unknown"}
+                  </span>
+
+                </div>
+
+              </div>
+
+            );
+          }
+        )}
+
+      </div>
+
+
+      {/* Footer */}
+
+      <div className="relative mt-5 border-t border-slate-100 pt-4">
+
+        <div className="flex items-center justify-between gap-3">
+
+          <p
+            className={`text-xs font-medium ${
+              isHealthy
+                ? "text-green-600"
+                : isDegraded
+                  ? "text-amber-600"
+                  : "text-red-500"
+            }`}
+          >
+            {loading
+              ? "Running health checks..."
+              : healthData?.message ||
+                error ||
+                "Health information unavailable."}
+          </p>
+
+
+          <ChevronRight
+            size={18}
+            className="shrink-0 text-slate-300 transition group-hover:text-slate-500"
+          />
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+
+// ============================================================
+// DASHBOARD CARD
+// ============================================================
+
+function DashboardCard({
+  icon,
+  title,
+  value,
+  subtitle,
+  loading = false,
+}) {
+
+  return (
+
+    <div className="group relative overflow-hidden rounded-2xl border border-red-100 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md sm:p-7">
+
+      {/* Decorative glow */}
+
+      <div className="pointer-events-none absolute -right-14 -top-14 h-32 w-32 rounded-full bg-red-50 opacity-70 blur-2xl transition group-hover:opacity-100" />
+
+
+      <div className="relative flex items-start justify-between">
+
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+          {icon}
+        </div>
+
+        <ChevronRight
+          size={24}
+          className="text-slate-400 transition group-hover:text-red-400"
+        />
+
+      </div>
+
+
+      <p className="relative mt-8 text-lg text-slate-500">
+        {title}
+      </p>
+
+
+      <div className="relative mt-2 min-h-[48px]">
+
+        {loading ? (
+
+          <div className="flex items-center gap-3 pt-2">
+
+            <LoaderCircle
+              size={28}
+              className="animate-spin text-red-400"
+            />
+
+            <span className="text-sm text-slate-400">
+              Loading...
+            </span>
+
+          </div>
+
+        ) : (
+
+          <p className="text-4xl font-bold text-black">
+            {value}
+          </p>
+
+        )}
+
+      </div>
+
+
+      <p className="relative mt-3 text-base text-slate-400">
+        {subtitle}
+      </p>
+
+    </div>
+
   );
 }
 
@@ -679,12 +1564,14 @@ function SidebarContent({
     },
   ];
 
+
   return (
+
     <div className="flex min-h-full flex-col">
 
       {/* Logo */}
 
-      <div className="px-6 pt-10 pb-12">
+      <div className="px-6 pb-12 pt-10">
 
         <div className="flex items-center gap-3">
 
@@ -708,29 +1595,44 @@ function SidebarContent({
 
       </div>
 
+
       {/* Navigation */}
 
       <nav className="space-y-2 px-6">
 
-        {menuItems.map((item) => {
+        {menuItems.map(
+          (item) => {
 
-          const Icon = item.icon;
+            const Icon =
+              item.icon;
 
-          return (
-            <SidebarItem
-              key={item.label}
-              icon={<Icon size={21} />}
-              label={item.label}
-              active={active === item.label}
-              onClick={() =>
-                onNavigate(item.label)
-              }
-            />
-          );
+            return (
 
-        })}
+              <SidebarItem
+                key={item.label}
+                icon={
+                  <Icon size={21} />
+                }
+                label={
+                  item.label
+                }
+                active={
+                  active ===
+                  item.label
+                }
+                onClick={() =>
+                  onNavigate(
+                    item.label
+                  )
+                }
+              />
+
+            );
+          }
+        )}
 
       </nav>
+
 
       {/* Sidebar Footer */}
 
@@ -759,6 +1661,7 @@ function SidebarItem({
 }) {
 
   return (
+
     <button
       type="button"
       onClick={onClick}
@@ -789,44 +1692,42 @@ function SidebarItem({
 
 
 // ============================================================
-// DASHBOARD CARD
+// HELPERS
 // ============================================================
 
-function DashboardCard({
-  icon,
-  title,
-  value,
-  subtitle,
-}) {
+function formatNumber(value) {
+  const numericValue =
+    Number(value);
 
-  return (
-    <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:p-7">
+  if (
+    !Number.isFinite(
+      numericValue
+    )
+  ) {
+    return "0";
+  }
 
-      <div className="flex items-start justify-between">
+  return new Intl.NumberFormat(
+    "en-US"
+  ).format(numericValue);
+}
 
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500">
-          {icon}
-        </div>
 
-        <ChevronRight
-          size={24}
-          className="text-slate-400"
-        />
+function formatTime(date) {
+  if (!date) {
+    return "";
+  }
 
-      </div>
-
-      <p className="mt-8 text-lg text-slate-500">
-        {title}
-      </p>
-
-      <p className="mt-2 text-4xl font-bold text-black">
-        {value}
-      </p>
-
-      <p className="mt-3 text-base text-slate-400">
-        {subtitle}
-      </p>
-
-    </div>
-  );
+  try {
+    return new Intl.DateTimeFormat(
+      "en-IN",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }
+    ).format(date);
+  } catch {
+    return "";
+  }
 }
