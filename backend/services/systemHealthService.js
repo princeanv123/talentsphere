@@ -1,10 +1,73 @@
 const supabase = require("../config/supabase");
-const { callGemini } = require("../utils/geminiHelper");
 
-// ======================================================
-// Check Supabase
-// ======================================================
+/*
+ * Gemini health is intentionally NOT tested by making a new
+ * Gemini API request on every dashboard health refresh.
+ *
+ * Gemini API requests consume quota. System Health may refresh
+ * frequently, so calling Gemini here would unnecessarily consume
+ * the project's quota.
+ *
+ * Instead, we maintain a lightweight cached status.
+ */
 
+let geminiHealthCache = {
+  status: "unknown",
+  message: "Gemini AI has not been tested recently.",
+  responseTimeMs: null,
+  checkedAt: null,
+};
+
+/*
+ * This function can be called by actual Gemini operations later.
+ * For example:
+ *
+ *   recordGeminiSuccess(responseTimeMs)
+ *   recordGeminiFailure(error, responseTimeMs)
+ *
+ * This allows System Health to report the result of real Gemini
+ * activity rather than generating artificial health-check traffic.
+ */
+
+const recordGeminiSuccess = (responseTimeMs = null) => {
+  geminiHealthCache = {
+    status: "healthy",
+    message: "Gemini AI is responding normally.",
+    responseTimeMs,
+    checkedAt: new Date().toISOString(),
+  };
+};
+
+const recordGeminiFailure = (error, responseTimeMs = null) => {
+  const errorMessage =
+    error?.message ||
+    error?.response?.data?.error?.message ||
+    "Gemini AI request failed.";
+
+  const normalizedMessage = String(errorMessage);
+
+  const isQuotaError =
+    normalizedMessage.includes("429") ||
+    normalizedMessage.includes("RESOURCE_EXHAUSTED") ||
+    normalizedMessage.includes("quota") ||
+    normalizedMessage.includes("Quota");
+
+  geminiHealthCache = {
+    status: isQuotaError ? "quota_exhausted" : "failed",
+    message: isQuotaError
+      ? "Gemini AI quota has been exhausted."
+      : "Gemini AI request failed.",
+    responseTimeMs,
+    checkedAt: new Date().toISOString(),
+  };
+};
+
+/*
+ * Supabase health check.
+ *
+ * This is safe to run during dashboard refresh because it does
+ * not consume Gemini quota.
+ */
 const checkSupabase = async () => {
   const start = Date.now();
 
@@ -24,63 +87,33 @@ const checkSupabase = async () => {
       message: "Database connection is healthy.",
       responseTimeMs: Date.now() - start,
     };
-
   } catch (error) {
-
     return {
       name: "Supabase",
       status: "failed",
-      message: error.message || "Supabase connection failed.",
+      message: "Supabase connection failed.",
       responseTimeMs: Date.now() - start,
     };
-
   }
 };
 
-
-// ======================================================
-// Check Gemini AI
-// ======================================================
-
-const checkGemini = async () => {
-  const start = Date.now();
-
-  try {
-
-    const response = await callGemini(
-      "Reply with exactly: HEALTHY"
-    );
-
-    if (!response) {
-      throw new Error("Empty response from Gemini.");
-    }
-
-    return {
-      name: "Gemini AI",
-      status: "healthy",
-      message: "Gemini AI is responding normally.",
-      responseTimeMs: Date.now() - start,
-    };
-
-  } catch (error) {
-
-    return {
-      name: "Gemini AI",
-      status: "failed",
-      message: error.message || "Gemini AI request failed.",
-      responseTimeMs: Date.now() - start,
-    };
-
-  }
+/*
+ * Gemini health is read from the cache.
+ *
+ * IMPORTANT:
+ * No Gemini API request is made here.
+ */
+const checkGemini = () => {
+  return {
+    name: "Gemini AI",
+    status: geminiHealthCache.status,
+    message: geminiHealthCache.message,
+    responseTimeMs: geminiHealthCache.responseTimeMs,
+    checkedAt: geminiHealthCache.checkedAt,
+  };
 };
-
-
-// ======================================================
-// Complete System Health Check
-// ======================================================
 
 const getSystemHealth = async () => {
-
   const start = Date.now();
 
   const components = {
@@ -93,31 +126,48 @@ const getSystemHealth = async () => {
 
     supabase: await checkSupabase(),
 
-    gemini: await checkGemini(),
+    gemini: checkGemini(),
   };
 
+  /*
+   * "unknown" is intentionally NOT treated as a failure.
+   *
+   * When the application has not made a Gemini request yet,
+   * we shouldn't falsely tell the user that Gemini is broken.
+   */
   const failedComponents = Object.values(components)
-    .filter((component) => component.status !== "healthy")
+    .filter(
+      (component) =>
+        component.status !== "healthy" &&
+        component.status !== "unknown"
+    )
     .map((component) => component.name);
 
-  const overallStatus =
-    failedComponents.length === 0
-      ? "healthy"
-      : "degraded";
+  const hasUnknownComponents = Object.values(components).some(
+    (component) => component.status === "unknown"
+  );
+
+  let overallStatus = "healthy";
+
+  if (failedComponents.length > 0) {
+    overallStatus = "degraded";
+  } else if (hasUnknownComponents) {
+    overallStatus = "healthy";
+  }
 
   return {
-    success: overallStatus === "healthy",
+    success: failedComponents.length === 0,
+
     status: overallStatus,
 
     message:
       overallStatus === "healthy"
-        ? "System has been monitored and found healthy."
+        ? "System is operating normally."
         : "System health check detected an issue.",
 
     checkedAt: new Date().toISOString(),
 
-    totalResponseTimeMs:
-      Date.now() - start,
+    totalResponseTimeMs: Date.now() - start,
 
     components,
 
@@ -125,11 +175,8 @@ const getSystemHealth = async () => {
   };
 };
 
-
-// ======================================================
-// Export
-// ======================================================
-
 module.exports = {
   getSystemHealth,
+  recordGeminiSuccess,
+  recordGeminiFailure,
 };

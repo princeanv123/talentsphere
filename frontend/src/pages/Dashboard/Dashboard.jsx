@@ -1311,13 +1311,17 @@ function SystemHealthCard({
                 ? "checking"
                 : "unknown");
 
-            const componentHealthy =
-              componentStatus ===
-              "healthy";
+const componentHealthy =
+  componentStatus ===
+  "healthy";
 
-            const componentFailed =
-              componentStatus ===
-              "failed";
+const componentFailed =
+  componentStatus ===
+  "failed";
+
+const componentQuotaExhausted =
+  componentStatus ===
+  "quota_exhausted";
 
             return (
 
@@ -1362,37 +1366,43 @@ function SystemHealthCard({
 
                 <div className="flex shrink-0 items-center gap-2">
 
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      componentHealthy
-                        ? "bg-green-500"
-                        : componentFailed
-                          ? "bg-red-500"
-                          : componentStatus ===
-                              "checking"
-                            ? "bg-amber-400 animate-pulse"
-                            : "bg-slate-300"
-                    }`}
-                  />
+   <span
+  className={`h-2 w-2 rounded-full ${
+    componentHealthy
+      ? "bg-green-500"
+      : componentQuotaExhausted
+        ? "bg-amber-500"
+        : componentFailed
+          ? "bg-red-500"
+          : componentStatus ===
+              "checking"
+            ? "bg-amber-400 animate-pulse"
+            : "bg-slate-300"
+  }`}
+/>
 
-                  <span
-                    className={`text-xs font-semibold ${
-                      componentHealthy
-                        ? "text-green-600"
-                        : componentFailed
-                          ? "text-red-600"
-                          : "text-slate-400"
-                    }`}
-                  >
-                    {componentHealthy
-                      ? "Healthy"
-                      : componentFailed
-                        ? "Failed"
-                        : componentStatus ===
-                            "checking"
-                          ? "Checking"
-                          : "Unknown"}
-                  </span>
+  <span
+  className={`text-xs font-semibold ${
+    componentHealthy
+      ? "text-green-600"
+      : componentQuotaExhausted
+        ? "text-amber-600"
+        : componentFailed
+          ? "text-red-600"
+          : "text-slate-400"
+  }`}
+>
+  {componentHealthy
+    ? "Healthy"
+    : componentQuotaExhausted
+      ? "Quota Exhausted"
+      : componentFailed
+        ? "Failed"
+        : componentStatus ===
+            "checking"
+          ? "Checking"
+          : "Unknown"}
+</span>
 
                 </div>
 
